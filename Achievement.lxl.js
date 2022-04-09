@@ -24,14 +24,24 @@ const langData_zh_CN={
             "minecraft:redstone_ore":"服务器感到了一丝危机",
             "minecraft:copper_ore":"这个东西有什么用呢？",
             "minecraft:ancient_debris":"一团生锈的金属片",
-            "minecraft:emerald_ore":"村民捕获器"
+            "minecraft:emerald_ore":"村民捕获器",
+            "minecraft:end_stone":"紫色虚空中飘浮的淡黄色岛屿",
+            "minecraft:netherrack":"布满腐败血肉的肮脏物体",
+            "minecraft:glass":"小心轻放",
+            "minecraft:stained_glass":"易碎品",
+            "minecraft:obsidian":"黑曜石之歌",
+            "minecraft:bedrock":"弑神",
+            "minecraft:grass":"草!(一种植物)",
+            "minecraft:bee_nest":"嗡嗡嗡~ 麻烦来了",
+            "minecraft:amethyst_block":"美丽迷人的紫水晶",
+            "minecraft:leaves":"环保主义者",
         },
         "inventoryChanges":{
             "minecraft:furnace":"聊的火热!",
             "minecraft:crafting_table":"工作时间到！",
             "minecraft:torch":"人生不是一支短短的蜡烛，而是一支由我们暂时拿着的火炬",
             "minecraft:campfire":"篝火晚会时间到！",
-            "minecraft:bread":"烤面包!",
+            "minecraft:bread":"你记得自己至今为止吃了多少片面包吗?",
             "minecraft:cake":"蛋糕是个谎言",
             "minecraft:wooden_sword":"击剑时间到！",
             "minecraft:stone_sword":"石矛与兽皮",
@@ -66,12 +76,23 @@ const langData_zh_CN={
             "minecraft:bow":"弓箭入门",
             "minecraft:shield":"固若金汤",
             "minecraft:golden_apple":"君临天下",
-            "minecraft:enchanted_golden_apple":"无敌是多么寂寞"
+            "minecraft:enchanted_golden_apple":"无敌是多么寂寞",
+            "minecraft:bamboo":"岁寒三友",
+            "minecraft:egg":"妈妈的味道",
+            "minecraft:lit_pumpkin":"不给糖,就捣蛋",
+            "minecraft:yellow_flower":"你是友情,还是错过的爱情",
+            "minecraft:bone":"狗狗的最爱",
+            "minecraft:nether_wart":"炼药师入门",
+            "minecraft:wheat":"锄禾日当午,汗滴禾下土",
+            "minecraft:chest":"箱子!",
+            "minecraft:clock":"进服送终",
+            "minecraft:fishing_rod":"孤舟蓑笠翁,独钓寒江雪",
+            "minecraft:map":"高德地图,竭诚为您导航",
         },
         "entitiesKilled":{
             "minecraft:creeper":"嘶~嘶~",
             "minecraft:zombie":"僵尸围城",
-            "minecraft:skeleton":"小心冷箭",
+            "minecraft:skeleton":"东风快递,使命必达",
             "minecraft:stray":"白色的眼睛和致命的弓",
             "minecraft:zombie_pigman":"是猪？还是僵尸？",
             "minecraft:drowned":"三叉戟的唯一来源",
@@ -140,7 +161,7 @@ const langData_zh_CN={
         },
         "dimensionalChange":{
             "1":"地狱空空荡荡,魔鬼都在人间!",
-            "2":"结束了?"
+            "2":"永恒、无星暗夜的维度"
         },
         "other":{
             "firstEnter":"Hello,world!"
@@ -321,6 +342,7 @@ const langData_en_US={
 
 let langConfig={
     "language":"zh_CN",
+    "reward":"minecraft:cooked_beef"
 }
 
 
@@ -330,6 +352,7 @@ let langConfig={
 
 let lang={};
 let achi_type={};
+let config={};
 
 
 /**
@@ -398,7 +421,16 @@ function getPlayer(list,id){//获取玩家
 }
 
 
+function rewardItem(){
+    return mc.newItem(config.reward,1);
+}
 
+function addTagAndRemoveAwhile(pl,tag){
+    pl.addTag(tag);
+    setTimeout(()=>{
+        pl.removeTag(tag);
+    },300);
+}
 
 
 
@@ -429,35 +461,53 @@ function join(player){//进服初始化玩家数据
 }
 
 function destroyBlock(player,block){//方块破坏类
-    let list=loadConfig();
-    if (player&&block&&list)
+    let list=loadConfig()
+    if (player && block && list && !player.hasTag("blockBreak")){
+        addTagAndRemoveAwhile(player,"blockBreak");
         isGetAchievement(block.type,player,list,"blockBreak");
+    }
 }
 
 function inventoryChange(player,slotNum,oldItem,newItem){//物品栏变化类
     let list=loadConfig();
-    if (player&&newItem&&list)
+    if (player && newItem && list && !player.hasTag("inventoryChanges")){
+        addTagAndRemoveAwhile(player,"inventoryChanges");
         isGetAchievement(newItem.type,player,list,"inventoryChanges");
+    }
 }
 
 function dimChange(player,dimId){//维度变化
     let list=loadConfig();
-    if (player&&dimId)
+    if (player && dimId && !player.hasTag("dimensionalChange")){
+        addTagAndRemoveAwhile(player,"dimensionalChange");
         isGetAchievement(dimId.toString(),player,list,"dimensionalChange");
+    }
 }
 
 function entitiesKilled(mob,source){//杀死实体
     let list=loadConfig();
-    if (mob&&source&&source.type==="minecraft:player"&&list)
+    if (mob&&source && source.type === "minecraft:player" && list && !source.hasTag("entitiesKilled")){
+        addTagAndRemoveAwhile(source,"entitiesKilled");
         isGetAchievement(mob.type,source,list,"entitiesKilled");
+    }
 }
 
 function playerBeKilled(pl,source){//被杀死
     let list=loadConfig();
-    if (pl&&list&&source)
+    if (pl && list && source && !pl.hasTag("beKilled")){
+        addTagAndRemoveAwhile(pl,"beKilled");
         isGetAchievement(source.type,pl,list,"beKilled");
+    }
 }
 
+function beforeLeft(pl){//玩家退出时删除所有tag
+    if (pl){
+        let tags=["beKilled","entitiesKilled","dimensionalChange","inventoryChanges","blockBreak"];
+        tags.forEach(tag=>{
+            pl.removeTag(tag);
+        })
+    }
+}
 
 /**
  * @description:表单构建
@@ -521,7 +571,9 @@ function viewAchievement(cmd,origin,output,results){
 function broadcast(pl,msg){//全服广播
     mc.runcmd("playsound random.toast @a ~ ~ ~ 10 1 1");//播放音效
     mc.broadcast(broadcastMsgFormat(lang.menu.broadcastMsg,pl.name,msg));//广播信息
+    pl.giveItem(rewardItem());
 }
+
 
 function broadcastMsgFormat(rawMsg,plName,msg){//替换变量
     rawMsg=rawMsg.replace("${pl.name}",plName);
@@ -552,9 +604,11 @@ function initFile(){//创建初始化配置文件
 
 function initData(){//初始化数据
     let langData=readFromJsonFile(langFile);
-    if (langData){
+    let configData=readFromJsonFile(langConfigFile);
+    if (langData && configData){
         lang=langData;
         achi_type=lang.menu.achi_type;//成就类型
+        config=configData;
     }else {
         logger.error(lang.menu.error);
     }
@@ -613,6 +667,7 @@ mc.listen("onDestroyBlock",destroyBlock);
 mc.listen("onMobDie",entitiesKilled);
 mc.listen("onChangeDim",dimChange);
 mc.listen("onPlayerDie",playerBeKilled);
+mc.listen("onLeft",beforeLeft);
 
 //注册玩家命令
 mc.listen("onServerStarted",cmdSignUp);
@@ -623,5 +678,7 @@ initData();
 logger.setConsole(true,4);
 logger.info("[Achievement]Version:1.5");
 logger.info("[Achievement]Author:Stranger");
+logger.info("[Achievement]Language:"+config.language);
+logger.info("[Achievement]website:https://www.minebbs.com/resources/3434/");
 
 
