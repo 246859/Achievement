@@ -405,7 +405,7 @@ function isGetAchievement(key,player,list,type){
         if (!pl[type][key]){//成就是否完成
             let msg=lang.achievement[type][key];
             if (msg&&msg!==""){//成就是否存在
-                broadcast(player,msg);
+                broadcast(player,msg);//此处的player使用实时的玩家对象
                 pl[type][key]=true;
                 saveConfig(list);//保存配置文件
             }
@@ -488,7 +488,7 @@ function entitiesKilled(mob,source){//杀死实体
     let list=loadConfig();
     if (mob&&source && source.type === "minecraft:player" && list && !source.hasTag("entitiesKilled")){
         addTagAndRemoveAwhile(source,"entitiesKilled");
-        isGetAchievement(mob.type,source,list,"entitiesKilled");
+        isGetAchievement(mob.type,source.toPlayer(),list,"entitiesKilled");
     }
 }
 
