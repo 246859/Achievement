@@ -173,9 +173,9 @@ const langData_zh_CN={
         },
     },
     "menu":{//菜单语言配置
-        "mainTitle":"成就系统",
-        "achieved":"已完成成就",
-        "unAchieved":"未完成成就",
+        "mainTitle":"§l§5成§6就§b系§4统",
+        "achieved":"§l§a已完成成就",
+        "unAchieved":"§l§c未完成成就",
         "broadcastMsg":"§l[MINECRAFT]§r 玩家 §6${pl.name} §5获§b得§3成§e就 §2${msg}",
         "cmdDescription":"查看成就系统GUI View Achievement System GUI ",
         "cmdError":"执行主体为空或者非玩家",
@@ -328,8 +328,8 @@ const langData_en_US={
     },
     "menu":{//菜单语言配置
         "mainTitle":"achievement system",
-        "achieved":"Achievement completed",
-        "unAchieved":"unfinished achievement",
+        "achieved":"§aAchievement completed",
+        "unAchieved":"§cunfinished achievement",
         "broadcastMsg":"§l[MINECRAFT]§r player §6${pl.name} §5get achievement §2${msg}",
         "cmdDescription":"View Achievement System GUI 查看成就系统GUI",
         "cmdError":"The execution body is empty or non-player",
