@@ -5,10 +5,15 @@ const dir="./plugins/Achievement";
 const plDataFile="./plugins/Achievement/configs.json";//玩家数据文件
 const langFile="./plugins/Achievement/lang.json";//语言文件
 const langConfigFile="./plugins/Achievement/langConfig.json";//语言配置文件
+const plCountFile="./plugins/Achievement/count.json";//数据统计文件
+
+const icon_Achieved="textures/ui/New_confirm_Hover";//图标路径
+const icon_unAchieved="textures/ui/redX1";
 
 /**
  * @description 初始化全局变量
  */
+const plCountData={};
 const plData={players:[]};
 const langData_zh_CN={
     "achievement":{
@@ -39,7 +44,7 @@ const langData_zh_CN={
         "inventoryChanges":{
             "minecraft:furnace":"聊的火热!",
             "minecraft:crafting_table":"工作时间到！",
-            "minecraft:torch":"人生不是一支短短的蜡烛，而是一支由我们暂时拿着的火炬",
+            "minecraft:torch":"照亮前进的道路!",
             "minecraft:campfire":"篝火晚会时间到！",
             "minecraft:bread":"你记得自己至今为止吃了多少片面包吗?",
             "minecraft:cake":"蛋糕是个谎言",
@@ -487,8 +492,9 @@ function dimChange(player,dimId){//维度变化
 function entitiesKilled(mob,source){//杀死实体
     let list=loadConfig();
     if (mob&&source && source.type === "minecraft:player" && list && !source.hasTag("entitiesKilled")){
-        addTagAndRemoveAwhile(source,"entitiesKilled");
-        isGetAchievement(mob.type,source.toPlayer(),list,"entitiesKilled");
+        let pl= source.toPlayer();
+        addTagAndRemoveAwhile(pl,"entitiesKilled");
+        isGetAchievement(mob.type,pl,list,"entitiesKilled");
     }
 }
 
@@ -516,8 +522,8 @@ function beforeLeft(pl){//玩家退出时删除所有tag
 function achievementMenu(){
     let fm=mc.newSimpleForm();
     fm.setTitle(lang.menu.mainTitle);
-    fm.addButton(lang.menu.achieved);
-    fm.addButton(lang.menu.unAchieved);
+    fm.addButton(lang.menu.achieved,icon_Achieved);
+    fm.addButton(lang.menu.unAchieved,icon_unAchieved);
 
     return fm;
 }
@@ -594,6 +600,8 @@ function initFile(){//创建初始化配置文件
         file.mkdir(dir);
     if (!file.exists(plDataFile))//创建玩家数据文件
         file.writeTo(plDataFile,JSON.stringify(plData));
+    if (!file.exists(plCountFile))//创建玩家统计文件
+        file.writeTo(plCountFile,JSON.stringify(plCountData));
     if (!file.exists(langConfigFile))//创建语言配置文件
         file.writeTo(langConfigFile,JSON.stringify(langConfig));
     if (!file.exists(langFile))//创建语言文件
