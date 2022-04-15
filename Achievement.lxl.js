@@ -169,6 +169,14 @@ const langData_zh_CN = {
             "1": "地狱空空荡荡,魔鬼都在人间!",
             "2": "永恒、无星暗夜的维度"
         },
+        "onScoreChange":{
+            "moneyChange0":"大负翁",
+            "moneyChange1e4":"酒足饭饱",
+            "moneyChange1e5":"小康生活",
+            "moneyChange1e6":"百万富翁",
+            "moneyChange1e7":"千万富翁",
+            "moneyChange1e8":"富可敌国",
+        },
         "other": {
             "firstEnter": "Hello,world!",
             "getAll":"Goodbye,world"
@@ -187,6 +195,7 @@ const langData_zh_CN = {
             "inventoryChanges": "物品获得类",
             "entitiesKilled": "生物击杀类",
             "dimensionalChange": "维度变化类",
+            "onScoreChange": "计分板变化",
             "other": "其它类",
             "beKilled": "被击杀类"
         },
@@ -324,6 +333,14 @@ const langData_en_US = {
             "1": "Hell is empty, the devil is in the world!",
             "2": "It's over?"
         },
+        "onScoreChange":{
+            "moneyChange0":"big negative",
+            "moneyChange1e4":"satiated",
+            "moneyChange1e5":"Well-off life",
+            "moneyChange1e6":"millionaire",
+            "moneyChange1e7":"multimillionaire",
+            "moneyChange1e8":"rich to rival the country",
+        },
         "other": {
             "firstEnter": "Hello,world!",
             "achieveAll":"Goodbye,world"
@@ -364,8 +381,9 @@ let config = {}; //配置项
 let achievementCounts=0;//成就总数
 
 /**
- * @description:数据操作
+ * @description文件IO操作
  */
+
 function savePlData(list) {//保存玩家数据文件
     file.writeTo(plDataFile, JSON.stringify({players: list}));
 }
@@ -402,6 +420,19 @@ function saveJsonFile(path, data) {
     }
 
 }
+
+
+/**
+ * @description:成就数据操作
+ */
+
+function achievementJudge(player, type,key ,list){//玩家触发监听事件时判断成就获取
+    addTagAndRemoveAwhile(player, type);
+    isGetAchievement(key, player, list, type);
+    isGetAllAchievement(player);
+    saveAchievementCount(player);
+}
+
 
 function getPlayerAchievementCount(pl) {//获取玩家成就完成情况
     let plData = getPlayer(loadPlData(), pl.uniqueId);
@@ -442,7 +473,7 @@ function sumAchievementCount(){//统计成就词条总数
     return sum;
 }
 
-function isGetAchievement(key, player, list, type) {
+function isGetAchievement(key, player, list, type) {//是否获取成就
     let pl = getPlayer(list, player.uniqueId);
     if (pl) {//玩家是否存在
         if (!pl[type])
@@ -484,6 +515,23 @@ function isGetAllAchievement(pl){//是否获得全成就;
 }
 
 /**
+ * @description特殊成就处理
+ */
+
+function economyProcess(money){
+    let moneyKey='moneyChange';
+    switch (true){
+        case money <= 0:moneyKey+='0';break;
+        case money >= 1e4 && money <= 1e5:moneyKey+='1e4';break;
+        case money >= 1e5 && money <= 1e6:moneyKey+='1e5';break;
+        case money >= 1e6 && money <= 1e7:moneyKey+='1e6';break;
+        case money >= 1e7 && money <= 1e8:moneyKey+='1e7';break;
+        case money >= 1e8 :moneyKey+='1e8';break;
+    }
+    return moneyKey;
+}
+
+/**
  *@description:玩家行为监听
  */
 function join(player) {//进服初始化玩家数据
@@ -499,6 +547,7 @@ function join(player) {//进服初始化玩家数据
                 entitiesKilled: {},
                 dimensionalChange: {},
                 beKilled: {},
+                onScoreChange:{},
                 other: {
                     firstEnter: true,
                 }
@@ -522,20 +571,14 @@ function destroyBlock(player, block) {//方块破坏类
 function inventoryChange(player, slotNum, oldItem, newItem) {//物品栏变化类
     let list = loadPlData();
     if (player && newItem && list && !player.hasTag("inventoryChanges")) {
-        addTagAndRemoveAwhile(player, "inventoryChanges");
-        isGetAchievement(newItem.type, player, list, "inventoryChanges");
-        isGetAllAchievement(player);
-        saveAchievementCount(player);
+        achievementJudge(player,"inventoryChanges",newItem.type,list);
     }
 }
 
 function dimChange(player, dimId) {//维度变化
     let list = loadPlData();
     if (player && dimId && !player.hasTag("dimensionalChange")) {
-        addTagAndRemoveAwhile(player, "dimensionalChange");
-        isGetAchievement(dimId.toString(), player, list, "dimensionalChange");
-        isGetAllAchievement(player);
-        saveAchievementCount(player);
+        achievementJudge(player,"dimensionalChange",dimId.toString(),list);
     }
 }
 
@@ -543,20 +586,23 @@ function entitiesKilled(mob, source) {//杀死实体
     let list = loadPlData();
     if (mob && source && source.type === "minecraft:player" && list && !source.hasTag("entitiesKilled")) {
         let player = source.toPlayer();
-        addTagAndRemoveAwhile(player, "entitiesKilled");
-        isGetAchievement(mob.type, player, list, "entitiesKilled");
-        isGetAllAchievement(player);
-        saveAchievementCount(player);
+        achievementJudge(player,"entitiesKilled",mob.type,list);
     }
 }
 
 function playerBeKilled(player, source) {//被杀死
     let list = loadPlData();
     if (player && list && source && !player.hasTag("beKilled")) {
-        addTagAndRemoveAwhile(player, "beKilled");
-        isGetAchievement(source.type, player, list, "beKilled");
-        isGetAllAchievement(player);
-        saveAchievementCount(player);
+        achievementJudge(player,"beKilled",source.type,list);
+    }
+}
+
+function onScoreChange(player,num,name,disName){//计分板数值变化监听
+    let list = loadPlData();
+    if (player && name && disName){
+        if (name === "money"){
+           achievementJudge(player,"onScoreChange",economyProcess(num),list);
+        }
     }
 }
 
@@ -583,7 +629,7 @@ function achievementMenu(pl) {
     return fm;
 }
 
-function judge(fm, lang_keys, achievement, plData, type) {
+function judge(fm, lang_keys, achievement, plData, type) {//根据个人完成情况展示成就 type指的是否完成
     for (let i = 0; i < lang_keys.length; i++) {
         let lang_pro_keys = Object.keys(achievement[lang_keys[i]]);
         fm = fm.addLabel("§l§o§6" + achi_type[lang_keys[i]]);
@@ -621,8 +667,9 @@ function achievementChoose(pl, id) {
     }
 }
 
-function viewAchievement(cmd, origin, output, results) {
+function viewAchievement(cmd, origin, output, results) {//表单查看
     if (origin && origin.player) {
+        updatePlData(origin.player);
         origin.player.sendForm(achievementMenu(origin.player), achievementChoose);
     }
 }
@@ -679,6 +726,17 @@ function initData() {//初始化数据
     } else {
         logger.error(lang.menu.error);
     }
+}
+
+function updatePlData(pl){//更新玩家数据中的监听对象
+    let list = loadPlData();
+    let player = getPlayer(list,pl.uniqueId);
+    let keys = Object.keys(achi_type);
+    keys.forEach(key=>{
+        if (!player[key])
+            player[key] = {};
+    });
+    savePlData(list);
 }
 
 function loadLocalDataAndUpdate() {//加载本地的语言数据文件,并且检查更新
@@ -738,6 +796,7 @@ mc.listen("onMobDie", entitiesKilled);
 mc.listen("onChangeDim", dimChange);
 mc.listen("onPlayerDie", playerBeKilled);
 mc.listen("onLeft", beforeLeft);
+mc.listen('onScoreChanged',onScoreChange);
 
 //注册玩家命令
 mc.listen("onServerStarted", cmdSignUp);
