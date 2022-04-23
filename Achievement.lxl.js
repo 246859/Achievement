@@ -1,9 +1,9 @@
 /**
- * @description 文件地址常量
+ * @description 插件初始化全局常量
  */
-const dir = "./plugins/Achievement";
-const deprecatedPath = "./plugins/Achievement/configs.json"
-const plDataFile = "./plugins/Achievement/data.json";//玩家数据文件
+const dir = "./plugins/Achievement";//插件目录
+const deprecatedPath = "./plugins/Achievement/configs.json"//数据文件 旧
+const plDataFile = "./plugins/Achievement/data.json";//玩家数据文件 新
 const langFile = "./plugins/Achievement/lang.json";//语言文件
 const langConfigFile = "./plugins/Achievement/langConfig.json";//语言配置文件
 const plCountFile = "./plugins/Achievement/count.json";//数据统计文件
@@ -365,9 +365,21 @@ const langData_en_US = {
     }
 }
 
-const langConfig = {
+const langConfig = {//成就配置项
     "language": "zh_CN",
-    "reward": "minecraft:cooked_beef"
+    "reward":{
+        "type":"minecraft:cooked_beef",
+        "count":1,
+        "lore":"成就奖励物品"
+    },
+    "economy":{
+        "rank1":0,
+        "rank2":1e4,
+        "rank3":1e5,
+        "rank4":1e6,
+        "rank5":1e7,
+        "rank6":1e8
+    }
 }
 
 
@@ -427,10 +439,10 @@ function saveJsonFile(path, data) {
  */
 
 function achievementJudge(player, type,key ,list){//玩家触发监听事件时判断成就获取
-    addTagAndRemoveAwhile(player, type);
-    isGetAchievement(key, player, list, type);
-    isGetAllAchievement(player);
-    saveAchievementCount(player);
+    addTagAndRemoveAwhile(player, type);//给玩家添加tag防止短时间内多次触发成就
+    isGetAchievement(key, player, list, type);//判断是否当前成就是否已获取
+    isGetAllAchievement(player);//是否全成就
+    saveAchievementCount(player);//保存玩家成就完成数量
 }
 
 
@@ -498,7 +510,13 @@ function getPlayer(list, id) {//获取玩家数据
 }
 
 function rewardItem() {//奖励物品
-    return mc.newItem(config.reward, 1);
+    if (!config || !config.reward) return;
+
+    let reward = config.reward;
+    let rewardItem = mc.newItem(reward.type, reward.count);//生成物品
+    if (reward.lore !== "")
+        rewardItem.setLore([reward.lore]);//lore
+    return rewardItem;
 }
 
 function addTagAndRemoveAwhile(pl, tag) {//添加tag并在300毫秒后删除
@@ -520,13 +538,17 @@ function isGetAllAchievement(pl){//是否获得全成就;
 
 function economyProcess(money){
     let moneyKey='moneyChange';
+    if (!config || !config.economy)return;
+
+    let economy = config.economy;
+
     switch (true){
-        case money <= 0:moneyKey+='0';break;
-        case money >= 1e4 && money <= 1e5:moneyKey+='1e4';break;
-        case money >= 1e5 && money <= 1e6:moneyKey+='1e5';break;
-        case money >= 1e6 && money <= 1e7:moneyKey+='1e6';break;
-        case money >= 1e7 && money <= 1e8:moneyKey+='1e7';break;
-        case money >= 1e8 :moneyKey+='1e8';break;
+        case money <= economy.rank1:moneyKey+='0';break;
+        case money >= economy.rank2 && money <= economy.rank3:moneyKey+='1e4';break;
+        case money >= economy.rank3 && money <= economy.rank4:moneyKey+='1e5';break;
+        case money >= economy.rank4 && money <= economy.rank5:moneyKey+='1e6';break;
+        case money >= economy.rank5 && money <= economy.rank6:moneyKey+='1e7';break;
+        case money >= economy.rank6 :moneyKey+='1e8';break;
     }
     return moneyKey;
 }
@@ -608,7 +630,7 @@ function onScoreChange(player,num,name,disName){//计分板数值变化监听
 
 function beforeLeft(pl) {//玩家退出时删除所有tag
     if (pl) {
-        let tags = ["beKilled", "entitiesKilled", "dimensionalChange", "inventoryChanges", "blockBreak"];
+        let tags = Object.keys(achi_type);
         tags.forEach(tag => {
             pl.removeTag(tag);
         })
@@ -681,6 +703,7 @@ function broadcast(pl, msg) {//全服广播
     mc.runcmd("playsound random.toast @a ~ ~ ~ 10 1 1");//播放音效
     mc.broadcast(broadcastMsgFormat(lang.menu.broadcastMsg, pl.name, msg));//广播信息
     pl.giveItem(rewardItem());
+    pl.refreshItems();//刷新物品栏
 }
 
 
@@ -707,8 +730,12 @@ function initFile() {//创建初始化配置文件
         file.writeTo(plDataFile, JSON.stringify(plData));
     if (!file.exists(plCountFile))//创建玩家统计文件
         file.writeTo(plCountFile, JSON.stringify(plCountData));
+
     if (!file.exists(langConfigFile))//创建语言配置文件
         file.writeTo(langConfigFile, JSON.stringify(langConfig));
+    else
+        loadLocalConfigAndUpdate();
+
     if (!file.exists(langFile))//创建语言文件
         file.writeTo(langFile, JSON.stringify(languageJudge()));
     else //若存在则检查更新并追加内容
@@ -719,10 +746,10 @@ function initData() {//初始化数据
     let langData = readFromJsonFile(langFile);
     let configData = readFromJsonFile(langConfigFile);
     if (langData && configData) {
-        lang = langData;
+        lang = langData; //加载全局语言变量
         achi_type = lang.menu.achi_type;//成就类型
-        config = configData;
-        achievementCounts = sumAchievementCount();//成就总数
+        config = configData; //加载全局配置变量
+        achievementCounts = sumAchievementCount();//加载成就总数
     } else {
         logger.error(lang.menu.error);
     }
@@ -762,6 +789,15 @@ function loadLocalDataAndUpdate() {//加载本地的语言数据文件,并且检
     })
 
     saveJsonFile(langFile, localLangData);//保存
+}
+
+function loadLocalConfigAndUpdate(){//加载本地的配置文件,并且检查更新
+    let localConfig = readFromJsonFile(langConfigFile);
+    Object.keys(langConfig).forEach(key=>{
+        if (!localConfig[key])
+            localConfig[key] = langConfig[key];
+    });
+    saveJsonFile(langConfigFile,localConfig);
 }
 
 function languageJudge() {//在配置文件读取失败的情况默认使用中文
