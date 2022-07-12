@@ -367,6 +367,17 @@ const langData_en_US = {
 
 const langConfig = {//成就配置项
     "language": "zh_CN",
+    "money":{
+        "switch":true,
+        "type":"llmoney",
+        "score":50,
+        "name":"money"
+    },
+    "Exp":{
+        "switch":true,
+        "type":"xp",
+        "score":30
+    },
     "reward":{
         "type":"minecraft:cooked_beef",
         "count":1,
@@ -517,6 +528,49 @@ function rewardItem() {//奖励物品
     if (reward.lore !== "")
         rewardItem.setLore([reward.lore]);//lore
     return rewardItem;
+}
+
+function money_add(pl){//奖励金币
+    if (!config || !config.money) return false;
+
+    let addMoney = config.money;
+    if(addMoney.switch){
+        switch(addMoney.type){
+            case "llmoney":
+                let r=money.add(pl.xuid,addMoney.score);
+                return r;
+            case "scoreboard":
+                let ob=mc.getScoreObjective(addMoneyname);
+                if(ob == null){
+                    return false;
+                };
+                pl.addScore(addMoney.name,addMoney.score);
+                return true;
+            default :
+                return false;
+        }
+    }else{
+        return false;
+    }
+}
+
+function addExp(pl){//奖励经验
+    if (!config || !config.Exp) return false;
+    let Exp = config.Exp;
+    if(Exp.switch){
+        switch(Exp.type){
+            case "level":
+            case "lv":
+                return pl.addLevel(Exp.score);
+            case "xp":
+            case "exp":
+                return pl.addExperience(Exp.score);
+            default :
+                return false;
+        }
+    }else{
+        return false;
+    }
 }
 
 function addTagAndRemoveAwhile(pl, tag) {//添加tag并在300毫秒后删除
@@ -702,6 +756,8 @@ function viewAchievement(cmd, origin, output, results) {//表单查看
 function broadcast(pl, msg) {//全服广播
     mc.runcmd("playsound random.toast @a ~ ~ ~ 10 1 1");//播放音效
     mc.broadcast(broadcastMsgFormat(lang.menu.broadcastMsg, pl.name, msg));//广播信息
+    money_add(pl);
+    addExp(pl);
     pl.giveItem(rewardItem());
     pl.refreshItems();//刷新物品栏
 }
