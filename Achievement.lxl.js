@@ -187,6 +187,7 @@ const langData_zh_CN = {
         "achieved": "§l§a已完成成就",
         "unAchieved": "§l§c未完成成就",
         "broadcastMsg": "§l[MINECRAFT]§r 玩家 §6${pl.name} §5获§b得§3成§e就 §2${msg}",
+        "toastTitle":"§l§5获§b得§3成§e就",
         "cmdDescription": "查看成就系统GUI View Achievement System GUI ",
         "cmdError": "执行主体为空或者非玩家",
         "error": "配置文件读取错误",
@@ -702,6 +703,7 @@ function viewAchievement(cmd, origin, output, results) {//表单查看
 function broadcast(pl, msg) {//全服广播
     mc.runcmd("playsound random.toast @a ~ ~ ~ 10 1 1");//播放音效
     mc.broadcast(broadcastMsgFormat(lang.menu.broadcastMsg, pl.name, msg));//广播信息
+    pl.sendToast(lang.menu.toastTitle,`§a${msg}`);
     pl.giveItem(rewardItem());
     pl.refreshItems();//刷新物品栏
 }
@@ -845,5 +847,4 @@ logger.info("[Achievement]Version:1.9");
 logger.info("[Achievement]Author:Stranger");
 logger.info("[Achievement]Language:" + config.language);
 logger.info("[Achievement]website:https://www.minebbs.com/resources/3434/");
-
 
