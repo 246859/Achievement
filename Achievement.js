@@ -56,8 +56,9 @@ const DEFAULT_CONFIG = {
             lore: ["成就奖励物品"]//物品lore
         }
     },
-    debug: true,//调试模式
-    antiShake: 400 //防抖粒度
+    antiShake: 400, //防抖粒度
+    checkUpdate:true,//检查更新
+    debug: true//调试模式
 };
 
 /**
@@ -120,6 +121,7 @@ const Constant = {
                 dirInit: "插件目录创建完成",
                 data: "玩家数据文件创建完成",
                 config: "插件配置文件创建完成",
+                cache:"插件缓存文件创建完成",
                 lang: "语言文件创建完成",
                 configurationError: "插件配置文件初始化异常: ",
                 configUpdate: "配置文件信息更新完毕",
@@ -127,6 +129,7 @@ const Constant = {
                 updateError: "插件配置信息更新失败",
                 runtimeData: "插件运行时配置加载完毕",
                 runtimeLang: "插件运行时语言加载完毕",
+                persistenceCache: "插件缓存数据加载成功",
                 runtimePlData: "插件运行时玩家数据加载完毕",
                 runtimeError: "插件运行时数据加载异常: ",
                 currentLang: "当前语言为: ${}",
@@ -188,19 +191,18 @@ const Constant = {
 };
 
 /**
- * 全局变量对象
+ * 全局运行时对象
  * @type Object
  */
 const Runtime = {
-    map: new Map(),
-    entryTypeTotalCounts: 0,
-    entryTotalCounts: 0,
-    config: {debug: true, language: ZH_CN},
-    entry: undefined,
-    menu: undefined,
-    rewardManager: undefined,
-    displayManger: undefined,
-    achievementManager: undefined
+    entryTypeTotalCounts: 0,//当前版本成就类型总数
+    entryTotalCounts: 0,//当前版本成就词条总数
+    config: {debug: true, language: ZH_CN},//配置对象
+    entry: undefined,//词条对象
+    menu: undefined,//菜单对象
+    rewardManager: undefined,//奖励对象
+    displayManger: undefined,//展示对象
+    achievementManager: undefined//成就管理对象
 };
 
 
@@ -692,6 +694,12 @@ class Path {
     static LANG_DIR = `${this.ROOT_DIR}/Lang`;
 
     /**
+     * 备份目录
+     * @type {string}
+     */
+    static TEMP_DIR = `${this.ROOT_DIR}/Temp`;
+
+    /**
      * 玩家数据文件
      * @type {string}
      */
@@ -702,6 +710,12 @@ class Path {
      * @type {string}
      */
     static CONFIG_PATH = `${this.ROOT_DIR}/Config.json`;
+
+    /**
+     * 缓存文件
+     * @type {string}
+     */
+    static CACHE_PATH = `${this.ROOT_DIR}/Cache.json`;
 
 
     /**
@@ -766,18 +780,52 @@ class LangManager {
      * @param key
      */
     static getAchievementEntry(type, key) {
-        let entry = Runtime.entry[type].details[key];
-        if (!entry) throw new Error(Runtime.SystemInfo.achi.nonExistentEntry);
-        return entry;
+        let eqRes = this.eqMatch(type,key);
+        if (eqRes) return eqRes;
+        let regRes = this.regxMatch(type,key);
+        if (regRes) return regRes;
+        throw new Error(Runtime.SystemInfo.achi.nonExistentEntry);
+    }
+
+    /**
+     * 等值匹配
+     * @param type
+     * @param key
+     * @returns {*}
+     */
+    static eqMatch(type,key){
+        return this.getAchievementEntryType(type).details[key];
+    }
+
+    /**
+     * 正则匹配
+     * @param type
+     * @param key
+     */
+    static regxMatch(type,key) {
+        let achi_type = this.getAchievementEntryType(type);
+        let details = achi_type.details;
+        let regxObj = achi_type.regx;
+        //尝试从缓存中读取历史正则匹配结果
+        if (Cache.has(key)) return details[Cache.get(key)];
+        //缓存读不到就从正则对象里匹配
+        for (let regKey in regxObj){
+            if (new RegExp(regKey).test(key)) {
+                let mapTrigger = regxObj[regKey];
+                //放入缓存中
+                Cache.set(key,mapTrigger);
+                return this.eqMatch(type,mapTrigger);
+            }
+        }
+        return undefined;
     }
 
     /**
      * 获取一个指定的成就类型
      * @param type
-     * @param key
      * @returns {*}
      */
-    static getAchievementEntryType(type, key) {
+    static getAchievementEntryType(type) {
         let entryType = Runtime.entry[type];
         if (!entryType) throw new Error(Runtime.SystemInfo.achi.nonExistentEntry);
         return entryType;
@@ -907,6 +955,59 @@ class LangManager {
 
 }
 
+/**
+ * 运行时缓存对象
+ */
+class RuntimeCache {
+
+    static cacheMap = new Map();
+
+    static getCache = this.cacheMap.get;
+
+    static setCache(key,val){
+        if (Utils.isPrototypeOf(key)) throw new Error("key值为undefined或者null");
+        this.cacheMap.set(key,val);
+    }
+
+    static hasCache = this.cacheMap.has;
+
+    static removeCache = this.cacheMap.delete;
+}
+
+/**
+ * 持久缓存对象
+ */
+class PersistentCache{
+
+    static cacheMap = {};
+
+    static get(key){
+        if (key) return this.cacheMap[key];
+        return undefined;
+    }
+
+    static set(key,val){
+        if (key instanceof String) this.cacheMap[key] = val;
+        else throw new Error("错误的key数据类型");
+    }
+
+    static has(key){
+        if (key) return this.get(key) == true;
+        else return false;
+    }
+
+    static remove(key){
+        this.cacheMap[key] = undefined;
+    }
+
+    static init(obj){
+        this.cacheMap = obj;
+    }
+
+    static save(){
+       return IO.writeJsonFileAsync(Path.CACHE_PATH,this.cacheMap);
+    }
+}
 
 /**
  * 配置类
@@ -960,6 +1061,14 @@ class Configuration {
             LogUtils.debug(Runtime.SystemInfo.init.config);
         });
 
+        //缓存文件
+        const cache = IO.isNotExistsAsync(Path.CACHE_PATH).then((res)=>{
+            if (!res) return;
+            return IO.writeJsonFileAsync(Path.CONFIG_PATH,PersistentCache.cacheMap);
+        }).then(()=>{
+            LogUtils.debug(Runtime.SystemInfo.init.cache);
+        })
+
         //玩家数据文件
         const data = IO.isNotExistsAsync(Path.PLAYER_DATA_PATH).then((res) => {
             if (!res) return;
@@ -976,7 +1085,7 @@ class Configuration {
             LogUtils.debug(Runtime.SystemInfo.init.lang);
         });
 
-        await Promise.all([data, config, lang]).catch(err => {
+        await Promise.all([config,cache ,data,lang]).catch(err => {
             LogUtils.error(Runtime.SystemInfo.init.configurationError, err);
             throw err;
         });
@@ -1011,7 +1120,6 @@ class Configuration {
 
     /**
      * 主要负责从配置文件中读取数据
-     * 玩家数据与配置语言文件加载相互独立互不影响
      */
     static async initRuntimeData() {
 
@@ -1025,13 +1133,19 @@ class Configuration {
             LogUtils.debug(Runtime.SystemInfo.init.runtimeLang);
         });
 
+        //加载缓存数据
+        const persistenceCache = IO.readJsonFileAsync(Path.CACHE_PATH).then(cache=>{
+            LogUtils.debug(Runtime.SystemInfo.init.persistenceCache);
+            PersistentCache.init(cache);
+        });
+
         //加载玩家插件数据
         const dataRunTime = IO.readJsonFileAsync(Path.PLAYER_DATA_PATH).then(data => {
             Runtime.plData = data;
             LogUtils.debug(Runtime.SystemInfo.init.runtimePlData);
         });
 
-        await Promise.all([configRuntime, dataRunTime]).catch((err) => {
+        await Promise.all([configRuntime,persistenceCache, dataRunTime]).catch((err) => {
             LogUtils.error(Runtime.SystemInfo.init.runtimeError, err);
         });
     }
@@ -1357,6 +1471,10 @@ class RewardManager {
 class Achievement {
 
     /**
+     * 是否启用
+     */
+    enable;
+    /**
      * 成就信息
      */
     msg;
@@ -1367,6 +1485,7 @@ class Achievement {
     condition;
 
     constructor(msg, condition) {
+        this.enable = true;
         this.msg = msg;
         this.condition = condition;
     }
@@ -1517,10 +1636,12 @@ class Join {
     static ENTRY = {
         zh_CN: {
             special: {
+                enable:true,
                 name: "特殊",
                 details: {
                     join: new Achievement("Hello World!", "首次进入服务器"),
-                }
+                },
+                regx:{}
             }
         },
         en_US: {}
@@ -2357,7 +2478,7 @@ class ProjectileHitEntity {
      * @param source
      */
     static async shootDistanceImpl(en, source) {
-        let xuid = Runtime.map.get(source.uniqueId);
+        let xuid = RuntimeCache.getCache(source.uniqueId);
         if (!xuid) return;
         //获取弹射物绑定的玩家
         let pl = mc.getPlayer(xuid);
@@ -2377,7 +2498,7 @@ class ProjectileHitEntity {
                 });
             }
         }
-        Runtime.map.delete(source.uniqueId);
+        RuntimeCache.removeCache(source.uniqueId);
         EventProcessor.antiEventShake(pl, type);
         return res;
     }
@@ -2409,7 +2530,7 @@ class ProjectileCreated {
      */
     static async shootBindImpl(shooter, entity) {
         if (entity.type !== "minecraft:arrow") return;
-        Runtime.map.set(entity.uniqueId, shooter.xuid);
+        RuntimeCache.setCache(entity.uniqueId, shooter.xuid);
     }
 }
 
