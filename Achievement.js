@@ -57,7 +57,7 @@ const DEFAULT_CONFIG = {
         }
     },
     antiShake: 400, //防抖粒度
-    checkUpdate:true,//检查更新
+    checkUpdate: true,//检查更新
     debug: true//调试模式
 };
 
@@ -87,6 +87,7 @@ const LANG = {
  */
 
 const Constant = {
+    version: "achi_version",
     moneyType: {
         score: "score",
         llmoney: "llmoney"
@@ -121,7 +122,7 @@ const Constant = {
                 dirInit: "插件目录创建完成",
                 data: "玩家数据文件创建完成",
                 config: "插件配置文件创建完成",
-                cache:"插件缓存文件创建完成",
+                cache: "插件缓存文件创建完成",
                 lang: "语言文件创建完成",
                 configurationError: "插件配置文件初始化异常: ",
                 configUpdate: "配置文件信息更新完毕",
@@ -697,7 +698,7 @@ class Path {
      * 备份目录
      * @type {string}
      */
-    static TEMP_DIR = `${this.ROOT_DIR}/Temp`;
+    static TEMP_DIR = `$./plugins/Achievement_temp`;
 
     /**
      * 玩家数据文件
@@ -780,9 +781,9 @@ class LangManager {
      * @param key
      */
     static getAchievementEntry(type, key) {
-        let eqRes = this.eqMatch(type,key);
+        let eqRes = this.eqMatch(type, key);
         if (eqRes) return eqRes;
-        let regRes = this.regxMatch(type,key);
+        let regRes = this.regxMatch(type, key);
         if (regRes) return regRes;
         throw new Error(Runtime.SystemInfo.achi.nonExistentEntry);
     }
@@ -793,7 +794,7 @@ class LangManager {
      * @param key
      * @returns {*}
      */
-    static eqMatch(type,key){
+    static eqMatch(type, key) {
         return this.getAchievementEntryType(type).details[key];
     }
 
@@ -802,19 +803,19 @@ class LangManager {
      * @param type
      * @param key
      */
-    static regxMatch(type,key) {
+    static regxMatch(type, key) {
         let achi_type = this.getAchievementEntryType(type);
         let details = achi_type.details;
         let regxObj = achi_type.regx;
         //尝试从缓存中读取历史正则匹配结果
         if (Cache.has(key)) return details[Cache.get(key)];
         //缓存读不到就从正则对象里匹配
-        for (let regKey in regxObj){
+        for (let regKey in regxObj) {
             if (new RegExp(regKey).test(key)) {
                 let mapTrigger = regxObj[regKey];
                 //放入缓存中
-                Cache.set(key,mapTrigger);
-                return this.eqMatch(type,mapTrigger);
+                Cache.set(key, mapTrigger);
+                return this.eqMatch(type, mapTrigger);
             }
         }
         return undefined;
@@ -827,7 +828,7 @@ class LangManager {
      */
     static getAchievementEntryType(type) {
         let entryType = Runtime.entry[type];
-        if (!entryType) throw new Error(Runtime.SystemInfo.achi.nonExistentEntry);
+        if (!entryType) return undefined;
         return entryType;
     }
 
@@ -964,9 +965,9 @@ class RuntimeCache {
 
     static getCache = this.cacheMap.get;
 
-    static setCache(key,val){
+    static setCache(key, val) {
         if (Utils.isPrototypeOf(key)) throw new Error("key值为undefined或者null");
-        this.cacheMap.set(key,val);
+        this.cacheMap.set(key, val);
     }
 
     static hasCache = this.cacheMap.has;
@@ -977,35 +978,38 @@ class RuntimeCache {
 /**
  * 持久缓存对象
  */
-class PersistentCache{
+class PersistentCache {
 
     static cacheMap = {};
 
-    static get(key){
+    static get(key) {
         if (key) return this.cacheMap[key];
         return undefined;
     }
 
-    static set(key,val){
-        if (key instanceof String) this.cacheMap[key] = val;
+    static set(key, val) {
+        if (typeof key === "string") this.cacheMap[key] = val;
         else throw new Error("错误的key数据类型");
+        this.save().catch(err => {
+            LogUtils.error("缓存数据保存失败: ", err)
+        });
     }
 
-    static has(key){
+    static has(key) {
         if (key) return this.get(key) == true;
         else return false;
     }
 
-    static remove(key){
+    static remove(key) {
         this.cacheMap[key] = undefined;
     }
 
-    static init(obj){
+    static init(obj) {
         this.cacheMap = obj;
     }
 
-    static save(){
-       return IO.writeJsonFileAsync(Path.CACHE_PATH,this.cacheMap);
+    static save() {
+        return IO.writeJsonFileAsync(Path.CACHE_PATH, this.cacheMap);
     }
 }
 
@@ -1039,6 +1043,18 @@ class Configuration {
     }
 
     /**
+     * 备份数据
+     */
+    static backUpData() {
+        let current = new Date();
+        return IO.isNotExistsAsync(Path.TEMP_DIR).then(res => {
+            if (!res) File.mkdir(Path.TEMP_DIR);
+            return File.copy(`${Path.ROOT_DIR}/`,
+                `${Path.TEMP_DIR}/${current.getFullYear()}-${current.getMonth()}-${current.getDay()}-${current.getHours()}-${current.getMinutes()}-${current.getSeconds()}`);
+        });
+    }
+
+    /**
      * 加载配置文件
      * 其中插件目录必须同步加载,因为后面的配置文件依赖于根目录
      * 而后的三个配置文件相互独立互不影响，即并行加载
@@ -1062,10 +1078,10 @@ class Configuration {
         });
 
         //缓存文件
-        const cache = IO.isNotExistsAsync(Path.CACHE_PATH).then((res)=>{
+        const cache = IO.isNotExistsAsync(Path.CACHE_PATH).then((res) => {
             if (!res) return;
-            return IO.writeJsonFileAsync(Path.CONFIG_PATH,PersistentCache.cacheMap);
-        }).then(()=>{
+            return IO.writeJsonFileAsync(Path.CACHE_PATH, PersistentCache.cacheMap);
+        }).then(() => {
             LogUtils.debug(Runtime.SystemInfo.init.cache);
         })
 
@@ -1085,7 +1101,7 @@ class Configuration {
             LogUtils.debug(Runtime.SystemInfo.init.lang);
         });
 
-        await Promise.all([config,cache ,data,lang]).catch(err => {
+        await Promise.all([config, cache, data, lang]).catch(err => {
             LogUtils.error(Runtime.SystemInfo.init.configurationError, err);
             throw err;
         });
@@ -1096,6 +1112,29 @@ class Configuration {
      * @returns {Promise<void>}
      */
     static async updateConfigFile() {
+
+        let isNeedToUpdateData = true;
+
+        //加载缓存数据
+        await IO.readJsonFileAsync(Path.CACHE_PATH).then(cache => {
+            LogUtils.debug(Runtime.SystemInfo.init.persistenceCache);
+            PersistentCache.init(cache);
+        }).then(() => {
+            let cacheVersion = PersistentCache.get(Constant.version);
+            //如果缓存中没有版本信息或者与当前版本一致则没有必要更新数据
+            if (Utils.isNullOrUndefined(cacheVersion) || cacheVersion === PLUGINS_INFO.version) {
+                isNeedToUpdateData = false;
+            }
+        }).then(() => {
+            if (isNeedToUpdateData) {//如果有必要更新，则将所有数据备份。
+                LogUtils.info("检测到插件版本不一致，开始备份数据文件");
+                return this.backUpData();
+            }
+        }).then(res=>{
+            if (res) LogUtils.info(`数据已备份到${Path.TEMP_DIR}目录下，即将开始更新数据`);
+        });
+
+        if (!isNeedToUpdateData) return;
 
         //更新配置,配置文件必须保持与默认的格式严格一致
         const configUpdate = IO.isNotExistsAsync(Path.CONFIG_PATH).then(res => {
@@ -1118,6 +1157,7 @@ class Configuration {
         });
     }
 
+
     /**
      * 主要负责从配置文件中读取数据
      */
@@ -1133,19 +1173,13 @@ class Configuration {
             LogUtils.debug(Runtime.SystemInfo.init.runtimeLang);
         });
 
-        //加载缓存数据
-        const persistenceCache = IO.readJsonFileAsync(Path.CACHE_PATH).then(cache=>{
-            LogUtils.debug(Runtime.SystemInfo.init.persistenceCache);
-            PersistentCache.init(cache);
-        });
-
         //加载玩家插件数据
         const dataRunTime = IO.readJsonFileAsync(Path.PLAYER_DATA_PATH).then(data => {
             Runtime.plData = data;
             LogUtils.debug(Runtime.SystemInfo.init.runtimePlData);
         });
 
-        await Promise.all([configRuntime,persistenceCache, dataRunTime]).catch((err) => {
+        await Promise.all([configRuntime, dataRunTime]).catch((err) => {
             LogUtils.error(Runtime.SystemInfo.init.runtimeError, err);
         });
     }
@@ -1611,10 +1645,12 @@ class AchievementManager {
  * 说明
  * 1.每一个词条类型应该为如下格式
  * achi_type_name:{
+ *     enable:true,
  *     name:"displayName",
  *     details:{
  *         key:new Achievement(msg,condition)
- *     }
+ *     },
+ *     regx:{}
  * }
  * achi_type_name即成就类型名，displayName即对于用户而言展示的名称，details即该成就类型所对应的词条细节
  * key值可以理解为一个成就词条的触发器，而每一个成就词条都必须是一个Achievement对象，包含msg-成就信息，condition-达成条件
@@ -1636,12 +1672,12 @@ class Join {
     static ENTRY = {
         zh_CN: {
             special: {
-                enable:true,
+                enable: true,
                 name: "特殊",
                 details: {
                     join: new Achievement("Hello World!", "首次进入服务器"),
                 },
-                regx:{}
+                regx: {}
             }
         },
         en_US: {}
@@ -1655,7 +1691,6 @@ class Join {
     static process(pl) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
         if (Utils.isShaking(pl, Join.EVENT)) return;
-        LogUtils.debug([...arguments]);
         LogUtils.debug(`事件:${Join.EVENT} 名称:玩家进入服务器 参数列表:${[...arguments]} 对象:${pl.name}`);
         EventProcessor.asyncParallelCall(Join.defaultImpl(pl)).catch((err) => {
             LogUtils.error(`${Join.EVENT}: `, err);
@@ -1670,6 +1705,7 @@ class Join {
     static async defaultImpl(pl) {
         const type = "special";
         const key = "join";
+        if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         return [
             {
                 pl,
@@ -1740,6 +1776,7 @@ class ChangeDim {
 
     static defaultImpl(pl, dimid) {
         const type = "changeDim";
+        if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         return {
             pl,
             type,
@@ -1807,6 +1844,7 @@ class Destroy {
 
     static defaultImpl(pl, bl) {
         const type = "destroyBlock";
+        if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         EventProcessor.antiEventShake(pl, type);
         return [{
             pl,
@@ -1875,6 +1913,7 @@ class PlDie {
     static async defaultImpl(pl, source) {
         const type = "death";
         const key = source.type;
+        if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         return [{
             pl,
             type,
@@ -1955,8 +1994,9 @@ class MobDie {
     }
 
     static async killerImpl(mob, source, cause) {
-        if (!(source = Utils.toPlayer(source))) return;
         const type = "killer";
+        if (!(source = Utils.toPlayer(source))) return;
+        if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         EventProcessor.antiEventShake(source, type);
         return [{
             pl: source,
@@ -2021,6 +2061,7 @@ class ScoreChange {
         let entryType = LangManager.getAchievementEntryType(name);
         if (!entryType) return undefined;
         let type = name;
+        if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         //如果变化计分板名称是配置中所设置的经济计分板 且开启了配置中经济配置方式为计分板
         let key = undefined;
         let res = [];
@@ -2053,6 +2094,7 @@ class ScoreChange {
     static async scoreMoneyImpl(pl, num, name, disName) {
         if (Runtime.config.reward.economy.type === Constant.moneyType.score && name === Runtime.config.reward.economy.score) {
             let type = "ScoreMoney";//此为默认配置好的经济计分板项成就
+            if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
             return await ScoreChange.defaultImpl(pl, num, type, type);
         }
     }
@@ -2168,6 +2210,7 @@ class InventoryChange {
 
     static async defaultImpl(pl, slot, oldItem, newItem) {
         const type = "itemObtain";
+        if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         EventProcessor.antiEventShake(pl, type);
         if (oldItem.type === "" && newItem.type === "") return Promise.reject();
         return [{
@@ -2206,12 +2249,13 @@ class UseBucketTake {
     static process(pl, item, target) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
         if (Utils.isShaking(pl, UseBucketTake.EVENT)) return;
-        LogUtils.debug([...arguments]);
         LogUtils.debug(`事件:${UseBucketTake.EVENT} 名称:玩家使用桶装东西 参数列表:${[...arguments]} 玩家:${pl.name} 物品:${item.type} 目标:${target.type}`);
     }
 
 
-    static default(pl, item, target) {
+    static defaultImpl(pl, item, target) {
+        const type = "special";
+        if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         return {
             pl,
             type: this.EVENT,
@@ -2246,7 +2290,6 @@ class DropItem {
     static process(pl, item) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
         if (Utils.isShaking(pl, DropItem.EVENT)) return;
-        LogUtils.debug([...arguments]);
         LogUtils.debug(`事件:${DropItem.EVENT} 名称:玩家丢出物品 参数列表:${[...arguments]} 玩家:${pl.name} 物品:${item.type}`);
     }
 
@@ -2371,6 +2414,7 @@ class BedEnter {
     static async default(pl, pos) {
         let type = "special";
         let key = undefined;
+        if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         //TODO 根据睡觉的位置不同而提示不同成就
         switch (pl) {
             case pl.inClouds:
@@ -2423,6 +2467,8 @@ class Ride {
     }
 
     static async default(pl, mob) {
+        const type = "ride";
+        if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         return {
             pl,
             type: this.EVENT,
@@ -2478,6 +2524,8 @@ class ProjectileHitEntity {
      * @param source
      */
     static async shootDistanceImpl(en, source) {
+        const type = "shootDistance";
+        if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         let xuid = RuntimeCache.getCache(source.uniqueId);
         if (!xuid) return;
         //获取弹射物绑定的玩家
@@ -2486,7 +2534,6 @@ class ProjectileHitEntity {
         let pos = en.pos;
         //计算距离
         let distance = Math.floor(pl.distanceToPos(pos));
-        let type = "shootDistance";
         let res = [];
 
         for (let key in Runtime.entry.shootDistance.details) {
@@ -2529,6 +2576,8 @@ class ProjectileCreated {
      * @param entity
      */
     static async shootBindImpl(shooter, entity) {
+        const type = "shootDistance";
+        if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         if (entity.type !== "minecraft:arrow") return;
         RuntimeCache.setCache(entity.uniqueId, shooter.xuid);
     }
@@ -2630,7 +2679,6 @@ class EventProcessor {
      * type - 成就类型，基本等于监听事件的名称
      * key - 即触发器类型，如在物品栏变化事件中获得了物品工作台触发了此成就，工作台物品的type就是触发器
      * 因为考虑到很多时候一个事件监听中不同成就可能有不同的实现逻辑
-     * 在闭包中将不同的逻辑封装成异步函数，每一个逻辑并行处理，且规定了
      * 异步函数的返回值必须是Promise<[{pl, type, key}]>
      * 由Promise.all将所有的返回值收集完毕后，
      * 再由异步遍历器将参数并行循环传入成就处理器中，后续的逻辑处理则交给
@@ -2675,11 +2723,13 @@ class Application {
 
     static main() {
         Configuration.init().then(() => {
+            //注册事件
             EventProcessor.registerMcEvent();
+            //将版本信息写入缓存
+            PersistentCache.set(Constant.version, PLUGINS_INFO.version);
             LogUtils.info(Utils.loadTemplate(Runtime.SystemInfo.init.currentLang, Runtime.config.language));
             LogUtils.info(Utils.loadTemplate(Runtime.SystemInfo.init.initEntryCount, Runtime.entryTypeTotalCounts, Runtime.entryTotalCounts, EventProcessor.EVENT_PROCESSOR_LIST.length));
-            //输出加载完毕的运行时数据
-            // LogUtils.debug(Utils.loadTemplate(Runtime.SystemInfo.init.initialData, JSON.stringify(Runtime)));
+
         }).catch(err => {
             LogUtils.error(Runtime.SystemInfo.init.initError, err);
         });
