@@ -70,8 +70,9 @@ const LANG = {
         Entry: {},
         Menu: {
             display: {
-                toast: "获得成就",
-                chatBar: "[ACHIEVEMENT] 玩家 ${name} 获得成就 ${entry}"
+                toastTitle: "§l§a${title}",
+                toastMsg: "§3${msg}",
+                chatBar: "§l§6[ACHIEVEMENT]§r §e玩家 ${name} §c获得成就 §a${entry}§3 ———— ${condition}"
             }
         }
     },
@@ -349,6 +350,15 @@ class AsyncUtils {
 class Utils {
 
     /**
+     * 获取当前游戏时间
+     * @param type daytime gametime day
+     */
+    static getCurrentTime(type) {
+        let res = mc.runcmdEx(`time query ${type}`);
+        return res ? Utils.getNumberFromStr(res.output) : undefined;
+    }
+
+    /**
      * 将pos对象转换成一个数组
      * @param pos
      * @returns {(*|0|1|2)[]}
@@ -436,6 +446,15 @@ class Utils {
     static parseStrBoolExp(str, ...param) {
         //去掉所有非数字项与非比较运算符以及变量占位符
         return eval(Utils.loadTemplate(str.replaceAll(/[^0-9=<>&|${}]/g, ''), ...param));
+    }
+
+    /**
+     * 得到一个字符串里的所有数字
+     * @param str
+     * @returns {string}
+     */
+    static getNumberFromStr(str) {
+        return str.replaceAll(/[^0-9]/g, '');
     }
 
     /**
@@ -698,7 +717,7 @@ class Path {
      * 备份目录
      * @type {string}
      */
-    static TEMP_DIR = `$./plugins/Achievement_temp`;
+    static backUpDir = `${this.ROOT_DIR}/Temp`;
 
     /**
      * 玩家数据文件
@@ -808,13 +827,13 @@ class LangManager {
         let details = achi_type.details;
         let regxObj = achi_type.regx;
         //尝试从缓存中读取历史正则匹配结果
-        if (Cache.has(key)) return details[Cache.get(key)];
+        if (PersistentCache.has(key)) return details[PersistentCache.get(key)];
         //缓存读不到就从正则对象里匹配
         for (let regKey in regxObj) {
             if (new RegExp(regKey).test(key)) {
                 let mapTrigger = regxObj[regKey];
                 //放入缓存中
-                Cache.set(key, mapTrigger);
+                PersistentCache.set(key, mapTrigger);
                 return this.eqMatch(type, mapTrigger);
             }
         }
@@ -963,16 +982,18 @@ class RuntimeCache {
 
     static cacheMap = new Map();
 
-    static getCache = this.cacheMap.get;
+    static getCache(key) {
+        return this.cacheMap.get(key);
+    }
 
     static setCache(key, val) {
-        if (Utils.isPrototypeOf(key)) throw new Error("key值为undefined或者null");
+        if (Utils.isNullOrUndefined(key)) throw new Error("key值为undefined或者null");
         this.cacheMap.set(key, val);
     }
 
-    static hasCache = this.cacheMap.has;
-
-    static removeCache = this.cacheMap.delete;
+    static removeCache(key) {
+        return this.cacheMap.delete(key);
+    }
 }
 
 /**
@@ -1042,17 +1063,6 @@ class Configuration {
         Runtime.achievementManager = AchievementManager.assign({});
     }
 
-    /**
-     * 备份数据
-     */
-    static backUpData() {
-        let current = new Date();
-        return IO.isNotExistsAsync(Path.TEMP_DIR).then(res => {
-            if (!res) File.mkdir(Path.TEMP_DIR);
-            return File.copy(`${Path.ROOT_DIR}/`,
-                `${Path.TEMP_DIR}/${current.getFullYear()}-${current.getMonth()}-${current.getDay()}-${current.getHours()}-${current.getMinutes()}-${current.getSeconds()}`);
-        });
-    }
 
     /**
      * 加载配置文件
@@ -1061,13 +1071,6 @@ class Configuration {
      * @returns {Promise<void>}
      */
     static async initConfigFile() {
-
-        //插件目录
-        await IO.isNotExistsAsync(Path.ROOT_DIR).then((res) => {
-            if (!res) return;
-            File.mkdir(Path.ROOT_DIR);
-            LogUtils.debug(Runtime.SystemInfo.init.dirInit);
-        });
 
         //配置文件
         const config = IO.isNotExistsAsync(Path.CONFIG_PATH).then((res) => {
@@ -1125,13 +1128,6 @@ class Configuration {
             if (Utils.isNullOrUndefined(cacheVersion) || cacheVersion === PLUGINS_INFO.version) {
                 isNeedToUpdateData = false;
             }
-        }).then(() => {
-            if (isNeedToUpdateData) {//如果有必要更新，则将所有数据备份。
-                LogUtils.info("检测到插件版本不一致，开始备份数据文件");
-                return this.backUpData();
-            }
-        }).then(res=>{
-            if (res) LogUtils.info(`数据已备份到${Path.TEMP_DIR}目录下，即将开始更新数据`);
         });
 
         if (!isNeedToUpdateData) return;
@@ -1369,7 +1365,7 @@ class DisplayManager {
     async chatBarDisplay(pl, entry) {
         LogUtils.debug(JSON.stringify(entry));
         if (!this.chatBar.enable) return;
-        let finalMsg = Utils.loadTemplate(Runtime.menu.display.chatBar, pl.name, entry.msg);
+        let finalMsg = Utils.loadTemplate(Runtime.menu.display.chatBar, pl.name, entry.msg, entry.condition);
         LogUtils.debug(Utils.loadTemplate(Runtime.SystemInfo.display.chatBar, this.scope, pl.name, finalMsg));
         switch (this.scope) {
             case this.SCOPE.PUBLIC_SCOPE : {
@@ -1392,7 +1388,9 @@ class DisplayManager {
     async toastDisplay(pl, entry) {
         if (!this.toast.enable) return;
         LogUtils.debug(Utils.loadTemplate(Runtime.SystemInfo.display.toast, pl.name, entry.msg, entry.condition));
-        return pl.sendToast(entry.msg, entry.condition);
+        return pl.sendToast(
+            Utils.loadTemplate(Runtime.menu.display.toastTitle, entry.msg),
+            Utils.loadTemplate(Runtime.menu.display.toastMsg, entry.condition));
     }
 
     /**
@@ -1544,16 +1542,16 @@ class AchievementManager {
     /**
      * 判断玩家是否完成某个成就
      */
-    judgeAchievement({pl, type, key}, plData) {
-        this.initAchievement({pl, type}, plData);
+    judgeAchievement(pl, type, key, plData) {
+        this.initAchievement(pl, type, plData);
         return plData[pl.xuid][type][key];
     }
 
     /**
      * 修改指定玩家的指定成就的状态
      */
-    modifyAchievement({pl, type, key, status}, plData) {
-        this.initAchievement({pl, type}, plData);
+    modifyAchievement(pl, type, key, status, plData) {
+        this.initAchievement(pl, type, plData);
         //status 为true是新增,false是删除
         if (status) {
             plData[pl.xuid][type][key] = new PlayerAchievement(status, new Date().toLocaleString(), pl.pos);
@@ -1570,7 +1568,7 @@ class AchievementManager {
      * @param type
      * @param plData
      */
-    initAchievement({pl, type}, plData) {
+    initAchievement(pl, type, plData) {
         //如果玩家数据不存在就初始化该玩家的数据
         if (!plData[pl.xuid]) plData[pl.xuid] = new PlayerData(pl.name, pl.xuid, pl.uuid);
         //如果该类型的成就数据不存在就初始化该类型的成就数据
@@ -1596,17 +1594,21 @@ class AchievementManager {
         //参数校验
         if (Utils.hasNullOrUndefined(pl, type, key)) return Promise.reject();
         LogUtils.debug(Runtime.SystemInfo.achi.args);
+        let mapEntry;//有些词条会存在映射，映射得到的最终结果才是词条 即 key -> mapEntry
         //该词条是否存在
-        if (!LangManager.getAchievementEntry(type, key)) return;
+        if (!(mapEntry = LangManager.getAchievementEntry(type, key))) return;
         LogUtils.debug(Runtime.SystemInfo.achi.exist);
+        //判断该词条是否启用
+        if (!mapEntry.enable) return;
+        LogUtils.debug(`启用状态:${mapEntry.enable} 词条信息:${mapEntry.msg} 触发条件:${mapEntry.condition}`)
         //是否完成成就
-        if (this.judgeAchievement({pl, type, key}, Runtime.plData)) return;
+        if (this.judgeAchievement(pl, type, mapEntry.msg, Runtime.plData)) return;
         LogUtils.debug(Runtime.SystemInfo.achi.status);
         //修改成就完成状态
-        this.modifyAchievement({pl, type, key, status: true}, Runtime.plData);
+        this.modifyAchievement(pl, type, mapEntry.msg, true, Runtime.plData);
         LogUtils.debug(Runtime.SystemInfo.achi.update);
         //成就完成后处理
-        return this.postProcess({pl, type, key});
+        return this.postProcess(pl, mapEntry);
     }
 
     /**
@@ -1614,15 +1616,15 @@ class AchievementManager {
      * 所有操作都是异步并行，相互并不影响
      * 展示成就操作，成就奖励操作，成就数据保存操作
      * @param pl
-     * @param type
-     * @param key
+     * @param entry
      * @returns {Promise<Awaited<unknown>[]>}
      */
-    async postProcess({pl, type, key}) {
+    async postProcess(pl, entry) {
         return Promise.all([
             Runtime.rewardManager.rewardAsync(pl),
-            Runtime.displayManger.displayAchievementAsync(pl, LangManager.getAchievementEntry(type, key)),
-            this.savePlDataAsync(Runtime.plData)
+            Runtime.displayManger.displayAchievementAsync(pl, entry),
+            this.savePlDataAsync(Runtime.plData),
+            AfterFinished.process(pl, Runtime.plData[pl.xuid])
         ]);
     }
 
@@ -1673,7 +1675,7 @@ class Join {
         zh_CN: {
             special: {
                 enable: true,
-                name: "特殊",
+                name: "特殊成就",
                 details: {
                     join: new Achievement("Hello World!", "首次进入服务器"),
                 },
@@ -1748,12 +1750,14 @@ class ChangeDim {
     static ENTRY = {
         zh_CN: {
             changeDim: {
+                enable: true,
                 name: "维度成就",
                 details: {
                     "0": new Achievement("真是美好的世界", "到达主世界"),
                     "1": new Achievement("地狱空空荡荡，魔鬼都在人间", "到达地狱"),
                     "2": new Achievement("永恒、无星暗夜的维度", "到达末地")
-                }
+                },
+                regx: {}
             }
         },
         en_US: {}
@@ -1796,10 +1800,10 @@ class Destroy {
     static ENTRY = {
         zh_CN: {
             destroyBlock: {
-                name: "方块破坏成就",
+                enable: true,
+                name: "挖掘成就",
                 details: {
                     "minecraft:log": new Achievement("要致富，先撸树!", "首次砍掉原木"),
-                    "minecraft:log2": new Achievement("要致富，先撸树!", "首次挖掉原木"),
                     "minecraft:stone": new Achievement("疯狂的石头!", "首次挖掘石头"),
                     "minecraft:coal_ore": new Achievement("满面尘灰烟火色，两鬓苍苍十指黑", "首次挖掘煤矿"),
                     "minecraft:iron_ore": new Achievement("来点硬的!", "首次挖掘铁矿"),
@@ -1820,8 +1824,12 @@ class Destroy {
                     "minecraft:bee_nest": new Achievement("嗡嗡嗡~ 麻烦来了", "首次破坏蜂巢"),
                     "minecraft:amethyst_block": new Achievement("美丽迷人的紫水晶", "首次破坏紫水晶母岩"),
                     "minecraft:leaves": new Achievement("某瑞典人：How dare you !", "首次剪掉树叶"),
+                },
+                regx: {
+                    "minecraft:log": "minecraft:log"
                 }
-            }
+            },
+
         },
         en_US: {}
     }
@@ -1864,6 +1872,7 @@ class PlDie {
     static ENTRY = {
         zh_CN: {
             death: {
+                enable: true,
                 name: "死亡成就",
                 details: {
                     "minecraft:creeper": new Achievement("突如其来的惊喜!", "死于苦力怕"),
@@ -1891,12 +1900,13 @@ class PlDie {
                     "minecraft:enderman": new Achievement("敢瞅我？", "死于末影人"),
                     "minecraft:piglin": new Achievement("忘带钱了", "死于猪灵"),
                     "minecraft:endermite": new Achievement("小家伙", "死于末影螨"),
-                    "minecraft:ender_dragon": new Achievement("菜鸟，你的路才刚刚开始", "死于末影龙"),
+                    "minecraft:ender_dragon": new Achievement("不是吧，就这？", "死于末影龙"),
                     "minecraft:wither": new Achievement("不是吧，就这？", "死于凋零"),
                     "minecraft:player": new Achievement("死于谋杀", "死于玩家"),
                     "minecraft:dolphin": new Achievement("因果报应", "死于海豚"),
                     "minecraft:panda": new Achievement("功夫熊猫", "死于熊猫"),
-                }
+                },
+                regx: {}
             }
         },
         en_US: {}
@@ -1933,6 +1943,7 @@ class MobDie {
     static ENTRY = {
         zh_CN: {
             killer: {
+                enable: true,
                 name: "击杀成就",
                 details: {
                     "minecraft:creeper": new Achievement("嘶~嘶~", "首次击杀苦力怕"),
@@ -1970,7 +1981,8 @@ class MobDie {
                     "minecraft:pig": new Achievement("挺像你的", "首次击杀猪"),
                     "minecraft:cow": new Achievement("勇敢牛牛，不怕困难", '首次击杀牛'),
                     "minecraft:villager_v2": new Achievement("死不足惜", "首次击杀村民")
-                }
+                },
+                regx: {}
             },
         },
         en_US: {}
@@ -2017,6 +2029,7 @@ class ScoreChange {
     static ENTRY = {
         zh_CN: {
             "ScoreMoney": {
+                enable: true,
                 name: "经济成就",
                 details: {
                     "${}<=0": new Achievement("大负翁", "经济小于等于0"),
@@ -2026,7 +2039,8 @@ class ScoreChange {
                     "${}>=1000000": new Achievement("百万富翁", "经济大于等于100w"),
                     "${}>=10000000": new Achievement("千万富翁", "经济大于等于1000w"),
                     "${}>=100000000": new Achievement("亿万富翁", "经济大于等于10000w")
-                }
+                },
+                regx: {}
             },
         },
         en_US: {}
@@ -2068,7 +2082,7 @@ class ScoreChange {
         for (let exp in entryType.details) {
             key = exp;
             //如果该成就已完成则跳过
-            if (Runtime.achievementManager.judgeAchievement({pl, type, key}, Runtime.plData)) continue;
+            if (Runtime.achievementManager.judgeAchievement(pl, type, key, Runtime.plData)) continue;
             let expRes = Utils.parseStrBoolExp(exp, num);
             if (expRes) {
                 res.push({
@@ -2151,7 +2165,8 @@ class InventoryChange {
     static ENTRY = {
         zh_CN: {
             itemObtain: {
-                name: "物品获取成就",
+                enable: true,
+                name: "物品成就",
                 details: {
                     "minecraft:furnace": new Achievement("聊的火热!", "首次获得熔炉"),
                     "minecraft:crafting_table": new Achievement("工作时间到！", "首次获得工作台"),
@@ -2184,7 +2199,8 @@ class InventoryChange {
                     "minecraft:clock": new Achievement("进服送终", "首次获得时钟"),
                     "minecraft:fishing_rod": new Achievement("孤舟蓑笠翁,独钓寒江雪", "首次获得钓鱼竿"),
                     "minecraft:map": new Achievement("缺德地图,竭诚为您导航", "首次获得地图"),
-                }
+                },
+                regx: {}
             }
         },
         en_US: {}
@@ -2388,13 +2404,16 @@ class BedEnter {
 
     static ENTRY = {
         zh_CN: {
-            special: {
-                name: "特殊成就",
+            sleep: {
+                enable: true,
+                name: "睡眠成就",
                 details: {
-                    "cloudDream": new Achievement("云端之梦", "在云端层睡觉"),
-                    "undergroundDream": new Achievement("深渊之息", "在洞穴层睡觉"),
-                    "normalDream": new Achievement("小憩一刻", "首次睡觉")
-                }
+                    "cloudDream": new Achievement("云端之梦", "在云层之上睡一晚上"),
+                    "undergroundDream": new Achievement("深渊之息", "在洞穴层睡一晚上"),
+                    "normalDream": new Achievement("精神饱满", "安全的睡一晚上"),
+                    "rainDream": new Achievement("屋漏偏逢连夜雨", "在雨中睡一晚上")
+                },
+                regx: {}
             }
         },
         en_US: {}
@@ -2409,30 +2428,76 @@ class BedEnter {
         if (Utils.hasNullOrUndefined(...arguments)) return;
         if (Utils.isShaking(pl, BedEnter.EVENT)) return;
         LogUtils.debug(`事件:${BedEnter.EVENT} 名称:玩家上床 参数列表:${[...arguments]} 玩家:${pl.name} 位置:${Utils.getPosition(pos)} 是否在睡觉:${pl.isSleeping}`);
+
+        EventProcessor.asyncParallelCall(BedEnter.defaultImpl(...arguments)).catch(err => {
+            LogUtils.error(`事件:${BedEnter.EVENT}: `, err);
+        });
     }
 
-    static async default(pl, pos) {
-        let type = "special";
+    /**
+     * @param pl
+     * @param pos
+     * @returns {Promise<[{pl: ({isSleeping}|*), type: string, key: string}]>}
+     */
+    static async defaultImpl(pl, pos) {
+        if (Utils.isShaking(pl, BedEnter.EVENT)) return Promise.reject();
+        EventProcessor.antiEventShake(pl, BedEnter.EVENT);//为了防止死循环重复，必须提前防抖
+        let type = "sleep";
         let key = undefined;
         if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
-        //TODO 根据睡觉的位置不同而提示不同成就
-        switch (pl) {
-            case pl.inClouds:
-                key = "cloudDream";
-                break
-            case pos.y < 0 && pos.dimid === 0 :
-                key = "undergroundDream";
-                break
-            default: {
-                key = "normalDream";
+        if (pos.y > 200) {
+            key = "cloudDream";
+        } else if (pos.y < 0) {
+            key = "undergroundDream";
+        } else {
+            key = "normalDream";
+        }
+        if (pl.inRain) {
+            key = "rainDream";
+        }
+        return BedEnter.asyncSleepValidate(pl).then(res => {
+            if (res) {
+                return [{
+                    pl,
+                    type,
+                    key
+                }
+                ];
             }
-        }
-        return {
-            pl,
-            type: this.EVENT,
-            key: EventProcessor.INDEX
-        }
+        });
     }
+
+
+    /**
+     * BDS中无法做到监听玩家睡醒，所以只能做曲线救国，用线程睡眠加时间判断
+     * 此事件的入口是玩家点击床时，随后在接下来的5秒内,不断检测玩家是否在睡觉，和时间
+     * 在检测结束后,倘若daytime变为了0-250这个区间内的数字，即变为了清晨，判断为睡醒
+     * @param pl
+     */
+    static async asyncSleepValidate(pl) {
+
+        let currentTime = 0;
+        await AsyncUtils.sleep(500);
+        LogUtils.debug("开始睡觉检测");
+
+        let sleepActor = 0;//睡眠计数因子，要真的睡觉的话，这玩意必须大于等于1
+
+        while (pl.isSleeping) {
+            await AsyncUtils.sleep(500);
+            if (!pl.isSleeping) break;
+            sleepActor++;
+            currentTime = Utils.getCurrentTime("daytime");
+            LogUtils.debug(`${pl.name}是否在睡觉: ${pl.isSleeping} 当前时间为: ${currentTime}`);
+        }
+        await AsyncUtils.sleep(700);
+        currentTime = Utils.getCurrentTime("daytime");
+        LogUtils.debug("睡觉检测结束")
+        LogUtils.debug(`当前时间为: ${currentTime}`)
+
+        //如果时间大于250则判断为不是清晨
+        return currentTime < 250 && sleepActor >= 1;
+    }
+
 }
 
 class Ride {
@@ -2489,14 +2554,16 @@ class ProjectileHitEntity {
     static ENTRY = {
         zh_CN: {
             shootDistance: {
+                enable: true,
                 name: "射击成就",
                 details: {
                     "20": new Achievement("十米开外", "用箭命中距离20以外的生物"),
                     "40": new Achievement("箭无虚发", "用箭命中距离40以外的生物"),
                     "60": new Achievement("神射手", "用箭命中距离60以外的生物"),
-                    "80": new Achievement("后裔本人", "用箭命中距离80以外的生物"),
+                    "80": new Achievement("百步穿杨", "用箭命中距离80以外的生物"),
                     "100": new Achievement("精准制导", "用箭命中距离100以外的生物")
-                }
+                },
+                regx: {}
             }
         },
         en_US: {}
@@ -2527,6 +2594,7 @@ class ProjectileHitEntity {
         const type = "shootDistance";
         if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         let xuid = RuntimeCache.getCache(source.uniqueId);
+        LogUtils.debug(xuid);
         if (!xuid) return;
         //获取弹射物绑定的玩家
         let pl = mc.getPlayer(xuid);
@@ -2535,8 +2603,7 @@ class ProjectileHitEntity {
         //计算距离
         let distance = Math.floor(pl.distanceToPos(pos));
         let res = [];
-
-        for (let key in Runtime.entry.shootDistance.details) {
+        for (let key in LangManager.getAchievementEntryType(type).details) {
             if (distance > Number.parseInt(key)) {
                 res.push({
                     pl,
@@ -2635,6 +2702,57 @@ class PlayerChat {
     }
 }
 
+/**
+ * 玩家完成成就后触发的成就
+ */
+class AfterFinished {
+
+    static ENTRY = {
+        zh_CN: {
+            "achiCount": {
+                enable: true,
+                name: "成就数量成就",
+                details: {
+                    "10": new Achievement("小有名气", "达成10个成就"),
+                    "50": new Achievement("轻车熟路", "达成50个成就"),
+                    "80": new Achievement("游戏人生", "达成80个成就"),
+                    "100": new Achievement("忠实粉丝", "达成100个成就"),
+                    "150": new Achievement("骨灰玩家", "达成150个成就"),
+                },
+                regx: {}
+            }
+        }
+    }
+
+    static async process(pl, plData) {
+        if (Utils.hasNullOrUndefined(...arguments)) return;
+        const EVENT = "AfterFinished";
+        LogUtils.debug(`事件:${EVENT} 名称:完成成就 参数列表${[...arguments]} 玩家:${pl.name} 成就数据:${plData} 成就完成数量:${plData.finished}`);
+        EventProcessor.asyncParallelCall(AfterFinished.defaultImpl(...arguments)).catch(err => {
+            LogUtils.error(`事件:${EVENT}: `, err);
+        })
+    }
+
+
+    static async defaultImpl(pl, plData) {
+        const type = "achiCount";
+        let res = [];
+        for (let count in LangManager.getAchievementEntryType(type).details) {
+            let key = count;
+            count = Number.parseInt(count);
+            if (plData.finished > count) {
+                res.push({
+                    pl,
+                    type,
+                    key
+                });
+            }
+        }
+
+        return res;
+    }
+}
+
 
 /**
  * 事件监听回调处理器
@@ -2671,7 +2789,8 @@ class EventProcessor {
             ProjectileHitEntity,
             ProjectileCreated,
             PlayerChat,
-            PlayerCmd
+            PlayerCmd,
+            AfterFinished
         ];
 
     /**
