@@ -445,7 +445,7 @@ class Utils {
      */
     static parseStrBoolExp(str, ...param) {
         //去掉所有非数字项与非比较运算符以及变量占位符
-        return eval(Utils.loadTemplate(str.replaceAll(/[^0-9=<>&|${}]/g, ''), ...param));
+        return Boolean(eval(Utils.loadTemplate(str.replaceAll(/[^0-9=<>&|+-/*%!()${}]/g, ''), ...param)));
     }
 
     /**
@@ -509,12 +509,16 @@ class Utils {
      * 多用于配置文件的中的变量替换
      * loadTemplate(“i am a  ${}”,man) => "i am a man"
      * @param str
-     * @param param
+     * @param params
      * @returns {*}
      */
-    static loadTemplate(str, ...param) {
-        for (let val of param) {
-            str = str.replace(/\${.*?}/, val);
+    static loadTemplate(str, ...params) {
+        let regx = /\${.*?}/;
+        let param = undefined;
+        let index = 0;
+        while (regx.test(str)) {
+            if (params[index]) param = params[index++];
+            str = str.replace(regx, param);
         }
         return str;
     }
@@ -1814,7 +1818,7 @@ class Destroy {
                     "minecraft:redstone_ore": new Achievement("服务器感到了一丝危机", "首次挖掘红石矿"),
                     "minecraft:copper_ore": new Achievement("这个东西有什么用呢？", "首次挖掘铜矿"),
                     "minecraft:emerald_ore": new Achievement("村民捕获器", "首次挖掘绿宝石矿"),
-                    "minecraft:end_stone": new Achievement("虚无的方块", "首次挖掘地狱岩"),
+                    "minecraft:end_stone": new Achievement("虚无的方块", "首次挖掘末地岩"),
                     "minecraft:netherrack": new Achievement("布满腐败血肉的肮脏物体", "首次挖掘地狱岩"),
                     "minecraft:glass": new Achievement("美好的事物就是用来破坏的", "首次破坏玻璃"),
                     "minecraft:stained_glass": new Achievement("即便染了色，美好的事物也还是用来破坏的", "首次破坏染色玻璃"),
@@ -1859,6 +1863,37 @@ class Destroy {
             type,
             key: bl.type
         }];
+    }
+}
+
+class Place {
+
+    /**
+     * 玩家放置完方块
+     * @type {string}
+     */
+    static EVENT = "afterPlaceBlock";
+
+    static ENTRY = {
+        zh_CN: {
+            place: {
+                enable: true,
+                name: "放置成就",
+                details: {},
+                regx: {}
+            }
+        },
+        en_US: {}
+    }
+
+    static process(pl, bl) {
+        if (Utils.hasNullOrUndefined(...arguments)) return;
+        LogUtils.debug(`事件:${Place.EVENT} 名称:玩家放置方块 参数列表:${[...arguments]} 玩家:${pl.name} 方块:${bl.type}`);
+    }
+
+
+    static defaultImpl(pl, bl) {
+
     }
 }
 
