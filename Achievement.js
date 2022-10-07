@@ -350,6 +350,18 @@ class AsyncUtils {
 class Utils {
 
     /**
+     * 判断一个玩家是否已经加载完成
+     * BDS服务端会在玩家进入服务器时初始化玩家数据
+     * 这会大量的循环的不断的触发一些事件监听，还会进入成就的判断逻辑
+     * 造成服务器的卡顿，所以需要判断玩家是否已经加载。
+     * @param pl
+     * @returns {boolean}
+     */
+    static isPlayerLoaded(pl) {
+        return !Utils.isNullOrUndefined(pl.gameMode);
+    }
+
+    /**
      * 获取当前游戏时间
      * @param type daytime gametime day
      */
@@ -2089,6 +2101,7 @@ class ScoreChange {
      * @param disName
      */
     static process(pl, num, name, disName) {
+        if (!Utils.isPlayerLoaded(pl)) return;
         if (Utils.hasNullOrUndefined(...arguments)) return;
         LogUtils.debug([...arguments]);
         LogUtils.debug(`事件:${ScoreChange.EVENT} 名称:玩家计分板数值变化 参数列表:${[...arguments]} 玩家:${pl.name} 计分板:${name} 数值:${num} 展示名称:${disName}`);
@@ -2249,6 +2262,7 @@ class InventoryChange {
      * @param newItem
      */
     static process(pl, slot, oldItem, newItem) {
+        if (!Utils.isPlayerLoaded(pl)) return;
         if (Utils.hasNullOrUndefined(...arguments)) return;
         if (Utils.isShaking(pl, InventoryChange.EVENT)) return;
         LogUtils.debug([...arguments]);
@@ -2418,6 +2432,7 @@ class ArmorSet {
      * @param item
      */
     static process(pl, slot, item) {
+        if (!Utils.isPlayerLoaded(pl)) return;
         if (Utils.hasNullOrUndefined(...arguments)) return;
         if (Utils.isShaking(pl, ArmorSet.EVENT)) return;
         LogUtils.debug(`事件:${ArmorSet.EVENT} 名称:玩家设置盔甲栏 参数列表:${[...arguments]} 玩家:${pl.name} 格子:${slot} 物品:${item.type}`);
