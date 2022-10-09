@@ -815,10 +815,10 @@ class LangManager {
     static getAchievementTriggerName(type, key) {
         let eqRes = this.eqMatch(type, key);
         LogUtils.debug(eqRes);
-        if (eqRes) return eqRes;
+        if (!Utils.isNullOrUndefined(eqRes)) return eqRes;
         let regRes = this.regxMatch(type, key);
         LogUtils.debug(regRes);
-        if (regRes) return regRes;
+        if (!Utils.isNullOrUndefined(regRes)) return regRes;
         return undefined;
     }
 
@@ -1738,9 +1738,9 @@ class AchievementManager {
         if (Utils.hasNullOrUndefined(pl, type, key)) return Promise.reject();
         // LogUtils.debug(Utils.loadTemplate(Runtime.SystemInfo.achi.enter, pl.name, type, key)); 这段代码会导致BDS直接假死 非常牛逼
         LogUtils.debug(Runtime.SystemInfo.achi.args);
-        let triggerName;//有些词条会存在映射，映射得到的最终结果才是词条 即 key -> mapEntry
+        let triggerName = LangManager.getAchievementTriggerName(type, key);//有些词条会存在映射，映射得到的最终结果才是词条 即 key -> mapEntry
         //根据key值获取词条真实的触发值
-        if (!(triggerName = LangManager.getAchievementTriggerName(type, key))) return;
+        if (Utils.isNullOrUndefined(triggerName)) return;
         LogUtils.debug(Runtime.SystemInfo.achi.exist);
         //获取真实对应的词条
         let mapEntry = LangManager.getAchievementEntry(type, triggerName);
@@ -1908,7 +1908,7 @@ class ChangeDim {
         zh_CN: {
             changeDim: {
                 enable: true, name: "维度成就", details: {
-                    "0": new Achievement("真是美好的世界", "到达主世界"),
+                    "0": new Achievement("真是美好的世界", "返回主世界"),
                     "1": new Achievement("地狱空空荡荡，魔鬼都在人间", "到达地狱"),
                     "2": new Achievement("永恒、无星暗夜的维度", "到达末地")
                 }, regx: {}
