@@ -316,6 +316,15 @@ class AsyncUtils {
             resolve();
         }, time));
     }
+
+    /**
+     * Async异常处理
+     * @param promiseAsync
+     * @returns {Promise<unknown | [any,null]>}
+     */
+    static asyncWrap(promiseAsync) {
+        return promiseAsync.then(data => [null, data]).catch(err => [err, null]);
+    }
 }
 
 /**
@@ -502,7 +511,7 @@ class Utils {
         let param = undefined;
         let index = 0;
         while (regx.test(str)) {
-            if (params[index]) param = params[index++];
+            if (!Utils.isNullOrUndefined(params[index])) param = params[index++];
             str = str.replace(regx, param);
         }
         return str;
@@ -524,7 +533,6 @@ class Utils {
      * @returns {boolean}
      */
     static hasNullOrUndefined(...params) {
-        if (this.isNullOrUndefined(params)) return false;
         for (let val of params) {
             if (this.isNullOrUndefined(val)) {
                 return true;
@@ -787,7 +795,7 @@ class LangManager {
      * @param key
      */
     static getCacheKey(type, key) {
-        return `${type}-${key}`;
+        return `lang-${type}-${key}`;
     }
 
     /**
@@ -1067,7 +1075,6 @@ class Configuration {
         Runtime.displayManger = DisplayManager.assign(Runtime.config.display);
         Runtime.rewardManager = RewardManager.assign(Runtime.config.reward);
     }
-
 
     /**
      * 加载配置文件
@@ -1389,7 +1396,7 @@ class PlDataManager {
     }
 
     static getCacheKey(pl, type, key) {
-        return `${pl.xuid}-${type}-${key}`;
+        return `pl-${pl.xuid}-${type}-${key}`;
     }
 
 }
@@ -1718,8 +1725,7 @@ class AchievementManager {
     static async process({pl, type, key}) {
         //参数校验
         if (Utils.hasNullOrUndefined(pl, type, key)) return Promise.reject();
-        LogUtils.debug(Utils.loadTemplate(Runtime.SystemInfo.achi.enter, pl.name, type, key));
-
+        // LogUtils.debug(Utils.loadTemplate(Runtime.SystemInfo.achi.enter, pl.name, type, key)); 这段代码会导致BDS直接假死 非常牛逼
         LogUtils.debug(Runtime.SystemInfo.achi.args);
         let triggerName;//有些词条会存在映射，映射得到的最终结果才是词条 即 key -> mapEntry
         //根据key值获取词条真实的触发值
@@ -1739,6 +1745,18 @@ class AchievementManager {
         //成就完成后处理
         return this.postProcess(pl, mapEntry);
     }
+
+    /**
+     * 处理结果
+     * @param awaitRes
+     * @returns {Promise<never>|Promise<undefined | Awaited<*>[]>}
+     */
+    static processAsync(awaitRes) {
+        return Utils.isNullOrUndefined(awaitRes) ? Promise.reject() : AchievementManager.process(awaitRes).catch(err => {
+            throw err;
+        });
+    }
+
 
     /**
      * 成就完成后的一些数据处理，
@@ -2210,32 +2228,7 @@ class ScoreChange {
      * @returns {Promise<{pl, type, key}>}
      */
     static async defaultImpl(pl, num, name) {
-        if (Utils.isShaking(pl, ScoreChange.EVENT)) return Promise.reject();
-        let entryType = LangManager.getAchievementEntryType(name);
-        if (!entryType) return Promise.reject();
-        let type = name;
-        //计分板防抖
-        EventProcessor.antiEventShake(pl, type);
-        //成就是否启用
-        if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
-        //如果变化计分板名称是配置中所设置的经济计分板 且开启了配置中经济配置方式为计分板
-        for (let exp in entryType.details) {
-            let key = exp;
-            let expRes;
-            const expCacheKey = `${exp}-${num}`;
-
-            if (RuntimeCache.has(expCacheKey)) {
-                expRes = RuntimeCache.getCache(expCacheKey);
-            } else {
-                expRes = Utils.parseStrBoolExp(exp, num);
-            }
-
-            if (expRes) {
-                return {
-                    pl, type, key
-                };
-            }
-        }
+        return NumberChange.defaultImpl(pl, name, num, true);
     }
 
     /**
@@ -2250,8 +2243,115 @@ class ScoreChange {
         if (Runtime.config.reward.economy.type === Constant.moneyType.score && name === Runtime.config.reward.economy.score) {
             let type = "ScoreMoney";//此为默认配置好的经济计分板项成就
             if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
-            return await ScoreChange.defaultImpl(pl, num, type);
+            return ScoreChange.defaultImpl(pl, num, type);
         }
+    }
+
+}
+
+class NumberChange {
+
+    static EVENT = "numberChange";
+
+    static EventImplList = ["numberChangeImpl"];
+
+
+    static numberChangeImpl(pl, type, num, multipart = false) {
+        if (Utils.hasNullOrUndefined(...arguments)) return;
+        EventProcessor.eventImplsProcess(NumberChange, [pl, type, num, multipart], NumberChange.EventImplList).catch(err => {
+            LogUtils.error(`${NumberChange.EVENT}: `, err);
+        });
+    }
+
+    /**
+     * 默认实现
+     * @param pl
+     * @param type
+     * @param num
+     * @param multipart
+     * @returns {Promise<never>|Promise<*[]>|Promise<{pl, type, key: string}>}
+     */
+    static defaultImpl(pl, type, num, multipart) {
+        //防抖
+        if (Utils.isShaking(pl, type)) return Promise.reject();
+        //计分板防抖
+        EventProcessor.antiEventShake(pl, type);
+        //获取词条类型
+        let entryType = LangManager.getAchievementEntryType(type);
+        //判断对应数字类型的成就是否存在或者是否启用
+        if (!entryType || !entryType.enable) return Promise.reject();
+        //最后进行数字逻辑处理
+        return multipart ? NumberChange.multipartImpl(pl, type, num, entryType) : NumberChange.singleImpl(pl, type, num, entryType);
+    }
+
+
+    /**
+     * 一次逻辑只会触发一个值
+     * @param pl
+     * @param type
+     * @param num
+     * @param entryType
+     * @returns {Promise<{pl, type, key: string}>}
+     */
+    static async singleImpl(pl, type, num, entryType) {
+        for (let boolExp in entryType.details) {
+            if (NumberChange.calculateExp(type, boolExp, num)) {
+                return {
+                    pl, type, key: boolExp
+                };
+            }
+        }
+    }
+
+    /**
+     * 一次逻辑会触发多个值
+     * @param pl
+     * @param type
+     * @param num
+     * @param entryType
+     * @returns {Promise<*[]>}
+     */
+    static async multipartImpl(pl, type, num, entryType) {
+        let res = [];
+        let key = undefined;
+        for (let boolExp in entryType.details) {
+            key = boolExp;
+            if (NumberChange.calculateExp(type, boolExp, num)) {
+                res.push({pl, type, key: boolExp});
+            }
+        }
+        return res;
+    }
+
+    /**
+     * 获取数字缓存key
+     * @param type
+     * @param exp
+     * @param num
+     * @returns {string}
+     */
+    static getNumCacheKey(type, exp, num) {
+        return `num-${type}-${exp}-${num}`;
+    }
+
+    /**
+     * 计算表达式
+     * @param type
+     * @param boolExp
+     * @param num
+     * @returns {boolean}
+     */
+    static calculateExp(type, boolExp, num) {
+        let expRes;
+        //获取缓存key
+        let expCacheKey = NumberChange.getNumCacheKey(type, boolExp, num);
+        //如果击中缓存，直接从缓存中读取
+        if (RuntimeCache.has(expCacheKey)) {
+            expRes = RuntimeCache.getCache(expCacheKey);
+        } else {//未击中缓存则计算表达式
+            expRes = Utils.parseStrBoolExp(boolExp, num);
+        }
+        return expRes;
     }
 
 }
@@ -2705,11 +2805,11 @@ class ProjectileHitEntity {
         zh_CN: {
             shootDistance: {
                 enable: true, name: "射击成就", details: {
-                    "20": new Achievement("十米开外", "用箭命中距离20以外的生物"),
-                    "40": new Achievement("箭无虚发", "用箭命中距离40以外的生物"),
-                    "60": new Achievement("神射手", "用箭命中距离60以外的生物"),
-                    "80": new Achievement("百步穿杨", "用箭命中距离80以外的生物"),
-                    "100": new Achievement("精准制导", "用箭命中距离100以外的生物")
+                    "${}>=20": new Achievement("十米开外", "用箭命中距离20以外的生物"),
+                    "${}>=40": new Achievement("箭无虚发", "用箭命中距离40以外的生物"),
+                    "${}>=60": new Achievement("神射手", "用箭命中距离60以外的生物"),
+                    "${}>=80": new Achievement("百步穿杨", "用箭命中距离80以外的生物"),
+                    "${}>=100": new Achievement("精准制导", "用箭命中距离100以外的生物")
                 }, regx: {}
             }
         }, en_US: {}
@@ -2740,8 +2840,8 @@ class ProjectileHitEntity {
     static async shootDistanceImpl(en, source) {
         const type = "shootDistance";
         if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
+        //获取绑定的玩家
         let xuid = RuntimeCache.getCache(source.uniqueId);
-        LogUtils.debug(xuid);
         if (!xuid) return;
         //获取弹射物绑定的玩家
         let pl = mc.getPlayer(xuid);
@@ -2749,16 +2849,8 @@ class ProjectileHitEntity {
         let pos = en.pos;
         //计算距离
         let distance = Math.floor(pl.distanceToPos(pos));
-        let res = [];
-        for (let key in LangManager.getAchievementEntryType(type).details) {
-            if (distance > Number.parseInt(key)) {
-                res.push({
-                    pl, type, key
-                });
-            }
-        }
+        let res = NumberChange.defaultImpl(pl, type, distance, true);
         RuntimeCache.removeCache(source.uniqueId);
-        EventProcessor.antiEventShake(pl, type);
         return res;
     }
 }
@@ -2935,9 +3027,16 @@ class EventProcessor {
      */
     static asyncParallelProcess(promises) {
         return AsyncUtils.iteratorAsync(promises, async (index, processRes) => {
-            return Utils.isNullOrUndefined(await processRes) ? Promise.reject() : AchievementManager.process(await processRes).catch(err => {
-                throw err;
-            });
+            let awaitRes = await processRes;
+            if (Array.isArray(awaitRes)) {
+                return AsyncUtils.iteratorAsync(awaitRes, (index, res) => {
+                    return AchievementManager.processAsync(res);
+                }).catch(err => {
+                    throw err;
+                });
+            } else {
+                return AchievementManager.processAsync(awaitRes);
+            }
         }).catch(err => {
             if (!Utils.isNullOrUndefined(err)) throw err;
         });
