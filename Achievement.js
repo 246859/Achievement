@@ -204,7 +204,6 @@ const Runtime = {
     menu: undefined,//菜单对象
     rewardManager: undefined,//奖励对象
     displayManger: undefined,//展示对象
-    achievementManager: undefined//成就管理对象
 };
 
 
@@ -326,9 +325,9 @@ class AsyncUtils {
      */
     static iteratorAsync(iterator, resolve) {
         return Promise.all((iterator instanceof Set || iterator instanceof Map) ? [...iterator.entries()].map(async entry => {
-            resolve(entry[0], entry[1]);
+            return resolve(entry[0], entry[1]);
         }) : Object.keys(iterator).map(async index => {
-            resolve(index, iterator[index]);
+            return resolve(index, iterator[index]);
         }));
     }
 
@@ -457,7 +456,7 @@ class Utils {
      */
     static parseStrBoolExp(str, ...param) {
         //去掉所有非数字项与非比较运算符以及变量占位符
-        return Boolean(eval(Utils.loadTemplate(str.replaceAll(/[^0-9=<>&|+-/*%!()${}]/g, ''), ...param)));
+        return Boolean(eval(Utils.loadTemplate(str.replaceAll(/[^0-9=<>&|+-/*%!()${}]/g, ""), ...param)));
     }
 
     /**
@@ -466,7 +465,7 @@ class Utils {
      * @returns {string}
      */
     static getNumberFromStr(str) {
-        return str.replaceAll(/[^0-9]/g, '');
+        return str.replaceAll(/[^0-9]/g, "");
     }
 
     /**
@@ -590,10 +589,10 @@ class Utils {
         Function.prototype.before = function (pre) {
             let _self = this;
             return function () {
-                pre.apply(this, arguments)
+                pre.apply(this, arguments);
                 return _self.apply(this, arguments);
-            }
-        }
+            };
+        };
         Function.prototype.after = function (post) {
             let _self = this;
             return function () {
@@ -601,8 +600,8 @@ class Utils {
                 //第一个参数是返回值
                 post.apply(this, [res, ...arguments]);
                 return res;
-            }
-        }
+            };
+        };
     }
 }
 
@@ -811,16 +810,25 @@ class LangManager {
     }
 
     /**
-     * 获取指定的一个成就词条
+     * 获取一个词条对象的缓存键值
      * @param type
      * @param key
      */
-    static getAchievementEntry(type, key) {
+    static getCacheKey(type, key) {
+        return `${type}-${key}`;
+    }
+
+    /**
+     * 获取取一个词条的触发值，触发值为undefine即该词条不存在
+     * @param type
+     * @param key
+     */
+    static getAchievementTriggerName(type, key) {
         let eqRes = this.eqMatch(type, key);
         if (eqRes) return eqRes;
         let regRes = this.regxMatch(type, key);
         if (regRes) return regRes;
-        throw new Error(Runtime.SystemInfo.achi.nonExistentEntry);
+        return undefined;
     }
 
     /**
@@ -830,7 +838,8 @@ class LangManager {
      * @returns {*}
      */
     static eqMatch(type, key) {
-        return this.getAchievementEntryType(type).details[key];
+        if (this.getAchievementEntryType(type).details[key]) return key;
+        else return undefined;
     }
 
     /**
@@ -848,7 +857,7 @@ class LangManager {
         for (let regKey in regxObj) {
             if (new RegExp(regKey).test(key)) {
                 let mapTrigger = regxObj[regKey];
-                //放入缓存中
+                //匹配成功后缓存中,下次直接从缓存中读取结果
                 PersistentCache.set(key, mapTrigger);
                 return this.eqMatch(type, mapTrigger);
             }
@@ -864,7 +873,16 @@ class LangManager {
     static getAchievementEntryType(type) {
         let entryType = Runtime.entry[type];
         if (!entryType) return undefined;
-        return entryType;
+        else return entryType;
+    }
+
+    /**
+     * 获取一个指定的成就词条
+     */
+    static getAchievementEntry(type, key) {
+        let achiType = this.getAchievementEntryType(type);
+        if (achiType) return achiType.details[key];
+        else return undefined;
     }
 
 
@@ -917,7 +935,7 @@ class LangManager {
             return this.langFileIterator(langGroup, langType, (path, fileName, data, langType, langGroup) => {
                 return innerResolver(path, fileName, data, langType, langGroup);
             }).catch(err => {
-                throw err
+                throw err;
             });
         });
     }
@@ -967,7 +985,7 @@ class LangManager {
         return this.langGroupIterator(langGroup, () => {
         }, (path, fileName, data) => {
             return Configuration.checkUpdateAndSave(path, data);
-        })
+        });
     }
 
     /**
@@ -998,6 +1016,7 @@ class RuntimeCache {
 
     static cacheMap = new Map();
 
+
     static getCache(key) {
         return this.cacheMap.get(key);
     }
@@ -1009,6 +1028,10 @@ class RuntimeCache {
 
     static removeCache(key) {
         return this.cacheMap.delete(key);
+    }
+
+    static has(key) {
+        return this.cacheMap.has(key);
     }
 }
 
@@ -1028,7 +1051,7 @@ class PersistentCache {
         if (typeof key === "string") this.cacheMap[key] = val;
         else throw new Error("错误的key数据类型");
         this.save().catch(err => {
-            LogUtils.error("缓存数据保存失败: ", err)
+            LogUtils.error("缓存数据保存失败: ", err);
         });
     }
 
@@ -1102,7 +1125,7 @@ class Configuration {
             return IO.writeJsonFileAsync(Path.CACHE_PATH, PersistentCache.cacheMap);
         }).then(() => {
             LogUtils.debug(Runtime.SystemInfo.init.cache);
-        })
+        });
 
         //玩家数据文件
         const data = IO.isNotExistsAsync(Path.PLAYER_DATA_PATH).then((res) => {
@@ -1187,7 +1210,8 @@ class Configuration {
 
         //加载玩家插件数据
         const dataRunTime = IO.readJsonFileAsync(Path.PLAYER_DATA_PATH).then(data => {
-            Runtime.plData = data;
+            //初始化玩家运行数据
+            PlDataManager.assign(data);
             LogUtils.debug(Runtime.SystemInfo.init.runtimePlData);
         });
 
@@ -1227,32 +1251,180 @@ class Configuration {
 class PlayerData {
 
     /**
-     * 玩家名称
-     */
-    name;
-    /**
      * 玩家xboxuuid 基于网络唯一
      */
     xuid;
-    /**
-     * 玩家本地存档uuid 基于存档唯一
-     */
-    uuid;
 
     /**
      * 已完成成就数量
      */
     finished;
 
-    constructor(name, xuid, uuid) {
-        this.name = name;
+    constructor(xuid, name) {
         this.xuid = xuid;
-        this.uuid = uuid;
         this.finished = 0;
     }
 
     static assign(source) {
         return Object.assign(new PlayerData(), source);
+    }
+
+}
+
+/**
+ * 玩家数据管理对象
+ */
+class PlDataManager {
+
+    /**
+     * 玩家数据
+     */
+    static plData;
+
+    /**
+     * 获取所有的玩家数据
+     * @returns {*}
+     */
+    static getPlData() {
+        return this.plData;
+    }
+
+    /**
+     * 初始化数据
+     * @param obj
+     */
+    static assign(obj) {
+        this.plData = obj;
+    }
+
+    /**
+     * 获取一个玩家的成就信息
+     * @param xuid
+     * @returns {undefined|*}
+     */
+    static getPlAchiInfo(xuid) {
+        if (xuid) return this.plData[xuid];
+        else return undefined;
+    }
+
+    /**
+     * 设置玩家成就信息
+     * @param xuid
+     * @param obj
+     * @returns {boolean}
+     */
+    static setPlAchiInfo(xuid, obj) {
+        if (xuid) {
+            return this.getPlData()[xuid] = obj;
+        } else return false;
+    }
+
+
+    /**
+     * 增加一个玩家成就信息
+     * @param xuid
+     * @returns {boolean}
+     */
+    static addPlAchiInfo(xuid) {
+        if (!this.hasPlayerInfo(xuid)) {
+            return this.setPlAchiInfo(xuid, new PlayerData(xuid));
+        }
+        return false;
+    }
+
+    /**
+     * 判断某个玩家数据是否存在
+     */
+    static hasPlayerInfo(xuid) {
+        return xuid && this.getPlAchiInfo(xuid);
+    }
+
+    /**
+     * 获取一个玩家成就类型的信息
+     * @param xuid
+     * @param type
+     */
+    static getPlAchiType(xuid, type) {
+        if (!this.hasPlayerInfo(xuid)) return undefined;
+        return this.getPlAchiInfo(xuid)[type];
+    }
+
+    /**
+     * 设置一个玩家成就类型的数据
+     * @param xuid
+     * @param type
+     * @param obj
+     * @returns {boolean}
+     */
+    static setPlAchiType(xuid, type, obj) {
+        if (!this.hasPlayerInfo(xuid)) return false;
+        return this.getPlAchiInfo(xuid)[type] = obj;
+    }
+
+    /**
+     * 判断某个玩家是否含有某个成就类型的数据
+     * @param xuid
+     * @param type
+     * @returns {boolean|*}
+     */
+    static hasPlAchiType(xuid, type) {
+        return type && this.getPlAchiType(xuid, type);
+    }
+
+    /**
+     * 获取一个玩家某词条信息数据
+     * @param xuid
+     * @param type
+     * @param key
+     */
+    static getPlAchiKey(xuid, type, key) {
+        if (!this.hasPlAchiType(xuid, type)) return undefined;
+        return this.getPlAchiType(xuid, type)[key];
+    }
+
+    /**
+     * 设置某玩家的词条信息
+     * @param xuid
+     * @param type
+     * @param key
+     * @param obj
+     * @returns {boolean|*}
+     */
+    static setPlAchiKey(xuid, type, key, obj) {
+        if (!this.hasPlAchiType(xuid, type)) return false;
+        return this.getPlAchiType(xuid, type)[key] = obj;
+    }
+
+    /**
+     * 判断一个玩家是否含有某个成绩词条
+     * @param xuid
+     * @param type
+     * @param key
+     * @returns {*}
+     */
+    static hasPlAchiKey(xuid, type, key) {
+        return key && this.getPlAchiKey(xuid, type, key);
+    }
+
+    static initPlayerInfo(pl, type) {
+        if (Utils.hasNullOrUndefined(...arguments)) return;
+        let xuid = pl.xuid;
+        //如果没有玩家信息就初始化玩家信息
+        if (!this.hasPlayerInfo(xuid)) this.addPlAchiInfo(xuid);
+        //如果该成就类型不存在就初始化该成就类型
+        if (!this.hasPlAchiType(xuid, type)) this.setPlAchiType(xuid, type, {});
+    }
+
+    /**
+     * 异步保存玩家数据
+     * @returns {Promise<unknown>}
+     */
+    static saveAsync() {
+        return IO.writeJsonFileAsync(Path.PLAYER_DATA_PATH, this.getPlData());
+    }
+
+    static getCacheKey(pl, type, key) {
+        return `${pl.xuid}-${type}-${key}`;
     }
 
 }
@@ -1435,17 +1607,17 @@ class RewardManager {
     /**
      * 经济配置项
      */
-    economy
+    economy;
 
     /**
      * exp配置项
      */
-    exp
+    exp;
 
     /**
      * 物品配置项
      */
-    item
+    item;
 
     constructor() {
     }
@@ -1558,45 +1730,32 @@ class AchievementManager {
     /**
      * 判断玩家是否完成某个成就
      */
-    judgeAchievement(pl, type, key, plData) {
-        this.initAchievement(pl, type, plData);
-        return plData[pl.xuid][type][key];
+    static judgeAchievement(pl, type, key) {
+        const cacheKey = PlDataManager.getCacheKey(pl, type, key);
+        //如果有缓存就直接返回缓存
+        if (RuntimeCache.has(cacheKey)) return RuntimeCache.getCache(cacheKey);
+        PlDataManager.initPlayerInfo(pl, type);
+        let isFinished = Boolean(PlDataManager.getPlAchiKey(pl.xuid, type, key));
+        //读取到玩家成就状态时，将其存入缓存
+        RuntimeCache.setCache(cacheKey, isFinished);
+        return isFinished;
     }
 
     /**
      * 修改指定玩家的指定成就的状态
      */
-    modifyAchievement(pl, type, key, status, plData) {
-        this.initAchievement(pl, type, plData);
+    static modifyAchievement(pl, type, key, status) {
+        PlDataManager.initPlayerInfo(pl, type);
         //status 为true是新增,false是删除
         if (status) {
-            plData[pl.xuid][type][key] = new PlayerAchievement(status, new Date().toLocaleString(), pl.pos);
-            plData[pl.xuid].finished++;
+            PlDataManager.setPlAchiKey(pl.xuid, type, key, new PlayerAchievement(status, new Date().toLocaleString(), pl.pos));
+            PlDataManager.getPlAchiInfo(pl.xuid).finished++;
         } else {
-            plData[pl.xuid][type][key] = undefined;
-            plData[pl.xuid].finished--;
+            PlDataManager.setPlAchiKey(pl.xuid, type, key, undefined);
+            PlDataManager.getPlAchiInfo(pl.xuid).finished--;
         }
-    }
-
-    /**
-     * 初始化一个成就
-     * @param pl
-     * @param type
-     * @param plData
-     */
-    initAchievement(pl, type, plData) {
-        //如果玩家数据不存在就初始化该玩家的数据
-        if (!plData[pl.xuid]) plData[pl.xuid] = new PlayerData(pl.name, pl.xuid, pl.uuid);
-        //如果该类型的成就数据不存在就初始化该类型的成就数据
-        if (!plData[pl.xuid][type]) plData[pl.xuid][type] = {};
-    }
-
-    /**
-     * 保存玩家的成就数据
-     * @param plData
-     */
-    savePlDataAsync(plData) {
-        return IO.writeJsonFileAsync(Path.PLAYER_DATA_PATH, plData);
+        //修改过玩家成就状态后，重新写入缓存。
+        RuntimeCache.setCache(PlDataManager.getCacheKey(pl, type, key), PlDataManager.getCacheKey(pl.xuid, type, key));
     }
 
     /**
@@ -1605,23 +1764,25 @@ class AchievementManager {
      * @param key 即触发器类型，如在物品栏变化事件中获得了物品工作台触发了此成就，工作台物品的type就是触发器
      * @param promises promise数组
      */
-    async process({pl, type, key}) {
+    static async process({pl, type, key}) {
         LogUtils.debug(Utils.loadTemplate(Runtime.SystemInfo.achi.enter, pl.name, type, key));
         //参数校验
         if (Utils.hasNullOrUndefined(pl, type, key)) return Promise.reject();
         LogUtils.debug(Runtime.SystemInfo.achi.args);
-        let mapEntry;//有些词条会存在映射，映射得到的最终结果才是词条 即 key -> mapEntry
-        //该词条是否存在
-        if (!(mapEntry = LangManager.getAchievementEntry(type, key))) return;
+        let triggerName;//有些词条会存在映射，映射得到的最终结果才是词条 即 key -> mapEntry
+        //根据key值获取词条真实的触发值
+        if (!(triggerName = LangManager.getAchievementTriggerName(type, key))) return;
         LogUtils.debug(Runtime.SystemInfo.achi.exist);
+        //获取真实对应的词条
+        let mapEntry = LangManager.getAchievementEntry(type, triggerName);
         //判断该词条是否启用
         if (!mapEntry.enable) return;
-        LogUtils.debug(`启用状态:${mapEntry.enable} 词条信息:${mapEntry.msg} 触发条件:${mapEntry.condition}`)
+        LogUtils.debug(`启用状态:${mapEntry.enable} 触发条件:${mapEntry.condition}`);
         //是否完成成就
-        if (this.judgeAchievement(pl, type, mapEntry.msg, Runtime.plData)) return;
+        if (this.judgeAchievement(pl, type, triggerName)) return;
         LogUtils.debug(Runtime.SystemInfo.achi.status);
         //修改成就完成状态
-        this.modifyAchievement(pl, type, mapEntry.msg, true, Runtime.plData);
+        this.modifyAchievement(pl, type, triggerName, true);
         LogUtils.debug(Runtime.SystemInfo.achi.update);
         //成就完成后处理
         return this.postProcess(pl, mapEntry);
@@ -1635,12 +1796,12 @@ class AchievementManager {
      * @param entry
      * @returns {Promise<Awaited<unknown>[]>}
      */
-    async postProcess(pl, entry) {
+    static async postProcess(pl, entry) {
         return Promise.all([
             Runtime.rewardManager.rewardAsync(pl),
             Runtime.displayManger.displayAchievementAsync(pl, entry),
-            this.savePlDataAsync(Runtime.plData),
-            AfterFinished.process(pl, Runtime.plData[pl.xuid])
+            PlDataManager.saveAsync(),
+            AfterFinished.process(pl, PlDataManager.getPlAchiInfo(pl.xuid))//成就达成后的成就
         ]);
     }
 
@@ -1699,7 +1860,12 @@ class Join {
             }
         },
         en_US: {}
-    }
+    };
+
+
+    static EventImplList = [
+        "defaultImpl"
+    ];
 
 
     /**
@@ -1709,8 +1875,9 @@ class Join {
     static process(pl) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
         if (Utils.isShaking(pl, Join.EVENT)) return;
-        LogUtils.debug(`事件:${Join.EVENT} 名称:玩家进入服务器 参数列表:${[...arguments]} 对象:${pl.name}`);
-        EventProcessor.asyncParallelCall(Join.defaultImpl(pl)).catch((err) => {
+        LogUtils.debug(`参数列表:`, ...arguments);
+        LogUtils.debug(`事件:${Join.EVENT} 名称:玩家进入服务器 对象:${pl.name}`);
+        EventProcessor.eventImplsProcess(Join, [pl], Join.EventImplList).catch((err) => {
             LogUtils.error(`${Join.EVENT}: `, err);
         });
     }
@@ -1721,6 +1888,7 @@ class Join {
      * @returns [{Promise<{pl, type: string, key: string}>}]
      */
     static async defaultImpl(pl) {
+        LogUtils.debug("jonin inininini");
         const type = "special";
         const key = "join";
         if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
@@ -1763,6 +1931,10 @@ class ChangeDim {
      */
     static EVENT = "onChangeDim";
 
+    static EventImplList = [
+        "defaultImpl"
+    ];
+
     static ENTRY = {
         zh_CN: {
             changeDim: {
@@ -1777,7 +1949,7 @@ class ChangeDim {
             }
         },
         en_US: {}
-    }
+    };
 
     /**
      * 玩家维度切换
@@ -1787,11 +1959,11 @@ class ChangeDim {
     static process(pl, dimid) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
         if (Utils.isShaking(pl, ChangeDim.EVENT)) return;
-        LogUtils.debug([...arguments]);
-        LogUtils.debug(`事件:${ChangeDim.EVENT} 名称:玩家维度切换 参数列表:${[...arguments]} 玩家:${pl.name} 维度:${dimid}`);
-        EventProcessor.asyncParallelCall(ChangeDim.defaultImpl(...arguments)).catch(err => {
+        LogUtils.debug(`参数列表:`, ...arguments);
+        LogUtils.debug(`事件:${ChangeDim.EVENT} 名称:玩家维度切 玩家:${pl.name} 维度:${dimid}`);
+        EventProcessor.eventImplsProcess(ChangeDim, [pl, dimid], ChangeDim.EventImplList).catch(err => {
             LogUtils.error(`${ChangeDim.EVENT}: `, err);
-        })
+        });
     }
 
     static defaultImpl(pl, dimid) {
@@ -1812,6 +1984,7 @@ class Destroy {
      * @type {string}
      */
     static EVENT = "onDestroyBlock";
+
 
     static ENTRY = {
         zh_CN: {
@@ -1848,7 +2021,11 @@ class Destroy {
 
         },
         en_US: {}
-    }
+    };
+
+    static EventImplList = [
+        "defaultImpl"
+    ];
 
     /**
      * 玩家破坏方块完成
@@ -1858,9 +2035,9 @@ class Destroy {
     static process(pl, bl) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
         if (Utils.isShaking(pl, Destroy.EVENT)) return;
-        LogUtils.debug([...arguments]);
-        LogUtils.debug(`事件:${Destroy.EVENT} 名称:玩家破坏方块 参数列表:${[...arguments]} 玩家:${pl.name} 方块:${bl.type}`);
-        EventProcessor.asyncParallelCall(Destroy.defaultImpl(pl, bl)).catch(err => {
+        LogUtils.debug(`参数列表:`, ...arguments);
+        LogUtils.debug(`事件:${Destroy.EVENT} 名称:玩家破坏方块 玩家:${pl.name} 方块:${bl.type}`);
+        EventProcessor.eventImplsProcess(Destroy, [pl, bl], ChangeDim.EventImplList).catch(err => {
             LogUtils.error(`${Destroy.EVENT}: `, err);
         });
 
@@ -1886,6 +2063,7 @@ class Place {
      */
     static EVENT = "afterPlaceBlock";
 
+
     static ENTRY = {
         zh_CN: {
             place: {
@@ -1896,16 +2074,24 @@ class Place {
             }
         },
         en_US: {}
-    }
+    };
+
+    static EventImplList = [
+        "defaultImpl"
+    ];
 
     static process(pl, bl) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        LogUtils.debug(`事件:${Place.EVENT} 名称:玩家放置方块 参数列表:${[...arguments]} 玩家:${pl.name} 方块:${bl.type}`);
+        LogUtils.debug(`参数列表:`, ...arguments);
+        LogUtils.debug(`事件:${Place.EVENT} 名称:玩家放置方块 玩家:${pl.name} 方块:${bl.type}`);
+        EventProcessor.eventImplsProcess(Place, [pl, bl], Place.EventImplList).catch(err => {
+            LogUtils.error(`${Place.EVENT}: `, err);
+        });
     }
 
 
     static defaultImpl(pl, bl) {
-
+        return Promise.reject();
     }
 }
 
@@ -1914,7 +2100,7 @@ class PlDie {
      * 玩家死亡
      * @type {string}
      */
-    static EVENT = "onPlayerDie"
+    static EVENT = "onPlayerDie";
 
     static ENTRY = {
         zh_CN: {
@@ -1957,14 +2143,19 @@ class PlDie {
             }
         },
         en_US: {}
-    }
+    };
+
+    static EventImplList = [
+        "defaultImpl"
+    ];
 
     static process(pl, source) {
         LogUtils.debug([...arguments]);
-        LogUtils.debug(`事件:${PlDie.EVENT} 名称:玩家死亡 参数列表:${[...arguments]} 玩家:${pl.name} 来源:${source.type}`);
-        EventProcessor.asyncParallelCall(PlDie.defaultImpl(...arguments)).catch(err => {
+        LogUtils.debug(`参数列表:`, ...arguments);
+        LogUtils.debug(`事件:${PlDie.EVENT} 名称:玩家死亡 玩家:${pl.name} 来源:${source.type}`);
+        EventProcessor.eventImplsProcess(PlDie, [pl, source], PlDie.EventImplList).catch(err => {
             LogUtils.error(`${PlDie.EVENT}: `, err);
-        })
+        });
     }
 
     static async defaultImpl(pl, source) {
@@ -1975,7 +2166,7 @@ class PlDie {
             pl,
             type,
             key
-        }]
+        }];
     }
 }
 
@@ -2026,14 +2217,18 @@ class MobDie {
                     "minecraft:sheep": new Achievement("谁会杀害温顺又可爱的绵羊呢？", "首次击杀羊"),
                     "minecraft:goat": new Achievement("山羊冲撞", "首次击杀山羊"),
                     "minecraft:pig": new Achievement("挺像你的", "首次击杀猪"),
-                    "minecraft:cow": new Achievement("勇敢牛牛，不怕困难", '首次击杀牛'),
+                    "minecraft:cow": new Achievement("勇敢牛牛，不怕困难", "首次击杀牛"),
                     "minecraft:villager_v2": new Achievement("死不足惜", "首次击杀村民")
                 },
                 regx: {}
             },
         },
         en_US: {}
-    }
+    };
+
+    static EventImplList = [
+        "defaultImpl"
+    ];
 
     /**
      * 生物死亡
@@ -2043,16 +2238,15 @@ class MobDie {
      */
     static process(mob, source, cause) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
-
         if (Utils.isShaking(source, MobDie.EVENT)) return;
-        LogUtils.debug([...arguments]);
-        LogUtils.debug(`事件:${MobDie.EVENT} 名称:生物死亡 参数列表:${[...arguments]} 死亡对象:${source.type} 来源对象:${mob.type} 死因:${cause}`);
-        EventProcessor.asyncParallelCall(MobDie.killerImpl(mob, source, cause)).catch(err => {
+        LogUtils.debug(`参数列表:`, ...arguments);
+        LogUtils.debug(`事件:${MobDie.EVENT} 名称:生物死亡 死亡对象:${source.type} 来源对象:${mob.type} 死因:${cause}`);
+        EventProcessor.eventImplsProcess(MobDie, [mob, source, cause], MobDie.EventImplList).catch(err => {
             LogUtils.error(`${MobDie.EVENT}: `, err);
-        })
+        });
     }
 
-    static async killerImpl(mob, source, cause) {
+    static async defaultImpl(mob, source, cause) {
         const type = "killer";
         if (!(source = Utils.toPlayer(source))) return;
         if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
@@ -2061,7 +2255,7 @@ class MobDie {
             pl: source,
             type,
             key: mob.type
-        }]
+        }];
     }
 }
 
@@ -2091,7 +2285,12 @@ class ScoreChange {
             },
         },
         en_US: {}
-    }
+    };
+
+    static EventImplList = [
+        "defaultImpl",
+        "scoreMoneyImpl"
+    ];
 
     /**
      * 计分板变化
@@ -2103,9 +2302,9 @@ class ScoreChange {
     static process(pl, num, name, disName) {
         if (!Utils.isPlayerLoaded(pl)) return;
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        LogUtils.debug([...arguments]);
-        LogUtils.debug(`事件:${ScoreChange.EVENT} 名称:玩家计分板数值变化 参数列表:${[...arguments]} 玩家:${pl.name} 计分板:${name} 数值:${num} 展示名称:${disName}`);
-        EventProcessor.asyncParallelCall(ScoreChange.defaultImpl(...arguments), ScoreChange.scoreMoneyImpl(...arguments)).catch(err => {
+        LogUtils.debug(`参数列表:`, ...arguments);
+        LogUtils.debug(`事件:${ScoreChange.EVENT} 名称:玩家计分板数值变化 玩家:${pl.name} 计分板:${name} 数值:${num} 展示名称:${disName}`);
+        EventProcessor.eventImplsProcess(ScoreChange, [pl, num, name, disName], ScoreChange.EventImplList).catch(err => {
             LogUtils.error(`${ScoreChange.EVENT}: `, err);
         });
     }
@@ -2115,14 +2314,17 @@ class ScoreChange {
      * @param pl
      * @param num
      * @param name
-     * @param disName
      * @returns {Promise<*[]>}
      */
-    static async defaultImpl(pl, num, name, disName) {
-        if (Utils.isShaking(pl, ScoreChange.EVENT)) return undefined;
+    static async defaultImpl(pl, num, name) {
+        if (Utils.isShaking(pl, ScoreChange.EVENT)) return Promise.reject();
+
         let entryType = LangManager.getAchievementEntryType(name);
-        if (!entryType) return undefined;
+        if (!entryType) return Promise.reject();
         let type = name;
+        //计分板防抖
+        EventProcessor.antiEventShake(pl, type);
+        //成就是否启用
         if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         //如果变化计分板名称是配置中所设置的经济计分板 且开启了配置中经济配置方式为计分板
         let key = undefined;
@@ -2130,18 +2332,16 @@ class ScoreChange {
         for (let exp in entryType.details) {
             key = exp;
             //如果该成就已完成则跳过
-            if (Runtime.achievementManager.judgeAchievement(pl, type, key, Runtime.plData)) continue;
+            if (Runtime.achievementManager.judgeAchievement(pl, type, key)) continue;
             let expRes = Utils.parseStrBoolExp(exp, num);
             if (expRes) {
                 res.push({
                     pl,
                     type,
                     key
-                })
+                });
             }
         }
-        //计分板防抖
-        EventProcessor.antiEventShake(pl, type);
         return res;
     }
 
@@ -2157,7 +2357,7 @@ class ScoreChange {
         if (Runtime.config.reward.economy.type === Constant.moneyType.score && name === Runtime.config.reward.economy.score) {
             let type = "ScoreMoney";//此为默认配置好的经济计分板项成就
             if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
-            return await ScoreChange.defaultImpl(pl, num, type, type);
+            return await ScoreChange.defaultImpl(pl, num, type);
         }
     }
 
@@ -2180,7 +2380,11 @@ class ConsumeTotem {
             }
         },
         en_US: {}
-    }
+    };
+
+    static EventImplList = [
+        "defaultImpl",
+    ];
 
     /**
      * 消耗图腾
@@ -2189,11 +2393,14 @@ class ConsumeTotem {
     static process(pl) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
         if (Utils.isShaking(pl, ConsumeTotem.EVENT)) return;
-        LogUtils.debug([...arguments]);
-        LogUtils.debug(`事件:${ConsumeTotem.EVENT} 名称:玩家消耗图腾 参数列表:${[...arguments]} 玩家:${pl.name}`);
+        LogUtils.debug(`参数列表:`, ...arguments);
+        LogUtils.debug(`事件:${ConsumeTotem.EVENT} 名称:玩家消耗图腾 玩家:${pl.name}`);
+        EventProcessor.eventImplsProcess(ConsumeTotem, [pl], ConsumeTotem.EventImplList).catch(err => {
+            LogUtils.error(`${ConsumeTotem.EVENT}: `, err);
+        });
     }
 
-    static default(pl) {
+    static defaultImpl(pl) {
         return {
             pl,
             type: this.EVENT,
@@ -2252,7 +2459,11 @@ class InventoryChange {
             }
         },
         en_US: {}
-    }
+    };
+
+    static EventImplList = [
+        "defaultImpl",
+    ];
 
     /**
      * 物品栏变化
@@ -2265,11 +2476,11 @@ class InventoryChange {
         if (!Utils.isPlayerLoaded(pl)) return;
         if (Utils.hasNullOrUndefined(...arguments)) return;
         if (Utils.isShaking(pl, InventoryChange.EVENT)) return;
-        LogUtils.debug([...arguments]);
-        LogUtils.debug(`事件:${InventoryChange.EVENT} 名称:玩家物品栏变化 参数列表:${[...arguments]} 玩家:${pl.name} 格子:${slot} 旧物品:${oldItem.type} 新物品:${newItem.type}`);
-        EventProcessor.asyncParallelCall(InventoryChange.defaultImpl(pl, slot, oldItem, newItem)).catch(err => {
+        LogUtils.debug(`参数列表:`, ...arguments);
+        LogUtils.debug(`事件:${InventoryChange.EVENT} 名称:玩家物品栏变化 玩家:${pl.name} 格子:${slot} 旧物品:${oldItem.type} 新物品:${newItem.type}`);
+        EventProcessor.eventImplsProcess(InventoryChange, [pl, slot, oldItem, newItem], InventoryChange.EventImplList).catch(err => {
             LogUtils.error(`${InventoryChange.EVENT}: `, err);
-        })
+        });
     }
 
 
@@ -2277,12 +2488,12 @@ class InventoryChange {
         const type = "itemObtain";
         if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         EventProcessor.antiEventShake(pl, type);
-        if (oldItem.type === "" && newItem.type === "") return Promise.reject();
+        if (newItem.type === "") return Promise.reject();
         return [{
             pl,
             type,
             key: newItem.type
-        }]
+        }];
     }
 }
 
@@ -2303,7 +2514,11 @@ class UseBucketTake {
             }
         },
         en_US: {}
-    }
+    };
+
+    static EventImplList = [
+        "defaultImpl",
+    ];
 
     /**
      * 使用桶装东西
@@ -2314,7 +2529,11 @@ class UseBucketTake {
     static process(pl, item, target) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
         if (Utils.isShaking(pl, UseBucketTake.EVENT)) return;
-        LogUtils.debug(`事件:${UseBucketTake.EVENT} 名称:玩家使用桶装东西 参数列表:${[...arguments]} 玩家:${pl.name} 物品:${item.type} 目标:${target.type}`);
+        LogUtils.debug(`参数列表:`, ...arguments);
+        LogUtils.debug(`事件:${UseBucketTake.EVENT} 名称:玩家使用桶装东西 玩家:${pl.name} 物品:${item.type} 目标:${target.type}`);
+        EventProcessor.eventImplsProcess(UseBucketTake, [pl, item, target], UseBucketTake.EventImplList).catch(err => {
+            LogUtils.error(`${UseBucketTake.EVENT}: `, err);
+        });
     }
 
 
@@ -2345,7 +2564,11 @@ class DropItem {
             }
         },
         en_US: {}
-    }
+    };
+
+    static EventImplList = [
+        "defaultImpl",
+    ];
 
     /**
      * 丢出物品
@@ -2355,10 +2578,14 @@ class DropItem {
     static process(pl, item) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
         if (Utils.isShaking(pl, DropItem.EVENT)) return;
-        LogUtils.debug(`事件:${DropItem.EVENT} 名称:玩家丢出物品 参数列表:${[...arguments]} 玩家:${pl.name} 物品:${item.type}`);
+        LogUtils.debug(`参数列表:`, ...arguments);
+        LogUtils.debug(`事件:${DropItem.EVENT} 名称:玩家丢出物品 玩家:${pl.name} 物品:${item.type}`);
+        EventProcessor.eventImplsProcess(DropItem, [pl, item], DropItem.EventImplList).catch(err => {
+            LogUtils.error(`${DropItem.EVENT}: `, err);
+        });
     }
 
-    static default(pl, item) {
+    static defaultImpl(pl, item) {
         return {
             pl,
             type: this.EVENT,
@@ -2383,8 +2610,11 @@ class Eat {
             }
         },
         en_US: {}
-    }
+    };
 
+    static EventImplList = [
+        "defaultImpl",
+    ];
 
     /**
      * 食用食物
@@ -2394,8 +2624,11 @@ class Eat {
     static process(pl, item) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
         if (Utils.isShaking(pl, Eat.EVENT)) return;
-        LogUtils.debug(`事件:${Eat.EVENT} 名称:玩家吃东西 参数列表:${[...arguments]} 玩家:${pl.name} 物品:${item.type}`);
-
+        LogUtils.debug(`参数列表:`, ...arguments);
+        LogUtils.debug(`事件:${Eat.EVENT} 名称:玩家吃东西 玩家:${pl.name} 物品:${item.type}`);
+        EventProcessor.eventImplsProcess(Eat, [pl, item], Eat.EventImplList).catch(err => {
+            LogUtils.error(`${Eat.EVENT}: `, err);
+        });
     }
 
     static default(pl, item) {
@@ -2403,7 +2636,7 @@ class Eat {
             pl,
             type: this.EVENT,
             key: item.type
-        }
+        };
     }
 }
 
@@ -2423,7 +2656,12 @@ class ArmorSet {
             }
         },
         en_US: {}
-    }
+    };
+
+    static EventImplList = [
+        "defaultImpl",
+    ];
+
 
     /**
      * 盔甲栏设置
@@ -2435,11 +2673,16 @@ class ArmorSet {
         if (!Utils.isPlayerLoaded(pl)) return;
         if (Utils.hasNullOrUndefined(...arguments)) return;
         if (Utils.isShaking(pl, ArmorSet.EVENT)) return;
-        LogUtils.debug(`事件:${ArmorSet.EVENT} 名称:玩家设置盔甲栏 参数列表:${[...arguments]} 玩家:${pl.name} 格子:${slot} 物品:${item.type}`);
+        LogUtils.debug(`参数列表:`, ...arguments);
+        LogUtils.debug(`事件:${ArmorSet.EVENT} 名称:玩家设置盔甲栏 玩家:${pl.name} 格子:${slot} 物品:${item.type}`);
+        EventProcessor.eventImplsProcess(ArmorSet, [pl, slot, item], ArmorSet.EventImplList).catch(err => {
+            LogUtils.error(`${ArmorSet.EVENT}: `, err);
+        });
     }
 
-    static default(pl, slot, item) {
+    static async defaultImpl(pl, slot, item) {
         //TODO 装备盔甲成就实现
+        return Promise.reject();
     }
 
 }
@@ -2467,7 +2710,11 @@ class BedEnter {
             }
         },
         en_US: {}
-    }
+    };
+
+    static EventImplList = [
+        "defaultImpl",
+    ];
 
     /**
      * 玩家上床
@@ -2477,10 +2724,10 @@ class BedEnter {
     static process(pl, pos) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
         if (Utils.isShaking(pl, BedEnter.EVENT)) return;
-        LogUtils.debug(`事件:${BedEnter.EVENT} 名称:玩家上床 参数列表:${[...arguments]} 玩家:${pl.name} 位置:${Utils.getPosition(pos)} 是否在睡觉:${pl.isSleeping}`);
-
-        EventProcessor.asyncParallelCall(BedEnter.defaultImpl(...arguments)).catch(err => {
-            LogUtils.error(`事件:${BedEnter.EVENT}: `, err);
+        LogUtils.debug(`参数列表:`, ...arguments);
+        LogUtils.debug(`事件:${BedEnter.EVENT} 名称:玩家上床 玩家:${pl.name} 位置:${Utils.getPosition(pos)} 是否在睡觉:${pl.isSleeping}`);
+        EventProcessor.eventImplsProcess(BedEnter, [pl, pos], BedEnter.EventImplList).catch(err => {
+            LogUtils.error(`${BedEnter.EVENT}: `, err);
         });
     }
 
@@ -2535,17 +2782,18 @@ class BedEnter {
         while (pl.isSleeping) {
             await AsyncUtils.sleep(500);
             if (!pl.isSleeping) break;
+            if (sleepActor > 30) break;// 15秒超时时间
             sleepActor++;
             currentTime = Utils.getCurrentTime("daytime");
             LogUtils.debug(`${pl.name}是否在睡觉: ${pl.isSleeping} 当前时间为: ${currentTime}`);
         }
         await AsyncUtils.sleep(700);
         currentTime = Utils.getCurrentTime("daytime");
-        LogUtils.debug("睡觉检测结束")
-        LogUtils.debug(`当前时间为: ${currentTime}`)
+        LogUtils.debug("睡觉检测结束");
+        LogUtils.debug(`当前时间为: ${currentTime}`);
 
         //如果时间大于250则判断为不是清晨
-        return currentTime < 250 && sleepActor >= 1;
+        return currentTime < 250 && (sleepActor >= 1 && sleepActor < 30);
     }
 
 }
@@ -2566,7 +2814,11 @@ class Ride {
             }
         },
         en_US: {}
-    }
+    };
+
+    static EventImplList = [
+        "defaultImpl",
+    ];
 
     /**
      * 生物被骑乘
@@ -2577,7 +2829,11 @@ class Ride {
         if (Utils.hasNullOrUndefined(...arguments)) return;
         if (!(en1 = Utils.toPlayer(en1))) return;
         if (Utils.isShaking(en1, Ride.EVENT)) return;
-        LogUtils.debug(`事件:${Ride.EVENT} 名称:玩家骑乘实体 参数列表:${[...arguments]} 玩家:${en1.name} 实体:${en2.type}`);
+        LogUtils.debug(`参数列表:`, ...arguments);
+        LogUtils.debug(`事件:${Ride.EVENT} 名称:玩家骑乘实体 玩家:${en1.name} 实体:${en2.type}`);
+        EventProcessor.eventImplsProcess(Ride, [en1, en2], Ride.EventImplList).catch(err => {
+            LogUtils.error(`${Ride.EVENT}: `, err);
+        });
 
     }
 
@@ -2588,7 +2844,7 @@ class Ride {
             pl,
             type: this.EVENT,
             key: mob.type
-        }
+        };
     }
 
 }
@@ -2617,7 +2873,11 @@ class ProjectileHitEntity {
             }
         },
         en_US: {}
-    }
+    };
+
+    static EventImplList = [
+        "shootDistanceImpl",
+    ];
 
     /**
      * 生物被弹射物击中
@@ -2627,12 +2887,11 @@ class ProjectileHitEntity {
     static process(en, source) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
         if (Utils.isShaking(en, ProjectileHitEntity.EVENT)) return;
-        LogUtils.debug([...arguments]);
-        LogUtils.debug(`事件:${ProjectileHitEntity.EVENT} 名称:实体被弹射物击中 参数列表:${[...arguments]} 实体:${en.type} 弹射物:${source.type}`);
-
-        EventProcessor.asyncParallelCall(ProjectileHitEntity.shootDistanceImpl(...arguments)).catch(err => {
+        LogUtils.debug(`参数列表:`, ...arguments);
+        LogUtils.debug(`事件:${ProjectileHitEntity.EVENT} 名称:实体被弹射物击中 实体:${en.type} 弹射物:${source.type}`);
+        EventProcessor.eventImplsProcess(ProjectileHitEntity, [en, source], ProjectileHitEntity.EventImplList).catch(err => {
             LogUtils.error(`${ProjectileHitEntity.EVENT}: `, err);
-        })
+        });
     }
 
     /**
@@ -2675,14 +2934,19 @@ class ProjectileCreated {
      */
     static EVENT = "onProjectileCreated";
 
+    static EventImplList = [
+        "shootBindImpl",
+    ];
+
+
     static process(shooter, entity) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
         if (!(shooter = Utils.toPlayer(shooter))) return;
         if (Utils.isShaking(shooter, ProjectileHitEntity.EVENT)) return;
-        LogUtils.debug([...arguments]);
-        LogUtils.debug(`事件:${ProjectileCreated.EVENT} 名称:玩家发射弹射物 参数列表:${[...arguments]} 玩家:${shooter.name} 弹射物:${entity.type} UID:${entity.uniqueId}`);
-        EventProcessor.asyncParallelCall(ProjectileCreated.shootBindImpl(shooter, entity)).catch(err => {
-            throw err;
+        LogUtils.debug(`参数列表:`, ...arguments);
+        LogUtils.debug(`事件:${ProjectileCreated.EVENT} 名称:玩家发射弹射物 玩家:${shooter.name} 弹射物:${entity.type} UID:${entity.uniqueId}`);
+        EventProcessor.eventImplsProcess(ProjectileCreated, [shooter, entity], ProjectileCreated.EventImplList).catch(err => {
+            LogUtils.error(`${ProjectileCreated.EVENT}: `, err);
         });
     }
 
@@ -2697,6 +2961,7 @@ class ProjectileCreated {
         if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         if (entity.type !== "minecraft:arrow") return;
         RuntimeCache.setCache(entity.uniqueId, shooter.xuid);
+        return Promise.reject();//只是做数据处理，不需要发送给成就处理器。
     }
 }
 
@@ -2717,13 +2982,18 @@ class PlayerCmd {
             }
         },
         en_US: {}
-    }
+    };
+
+    static EventImplList = [];
 
     static process(pl, cmd) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
         if (Utils.isShaking(pl, PlayerCmd.EVENT)) return;
-        LogUtils.debug([...arguments]);
-        LogUtils.debug(`事件:${PlayerCmd.EVENT} 名称:玩家使用命令 参数列表:${[...arguments]} 玩家:${pl.name} 命令:${cmd}`);
+        LogUtils.debug(`参数列表:`, ...arguments);
+        LogUtils.debug(`事件:${PlayerCmd.EVENT} 名称:玩家使用命令 玩家:${pl.name} 命令:${cmd}`);
+        EventProcessor.eventImplsProcess(PlayerCmd, [pl, cmd], PlayerCmd.EventImplList).catch(err => {
+            LogUtils.error(`${PlayerCmd.EVENT}: `, err);
+        });
     }
 }
 
@@ -2743,12 +3013,18 @@ class PlayerChat {
             }
         },
         en_US: {}
-    }
+    };
+
+    static EventImplList = [];
 
     static process(pl, msg) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
         if (Utils.isShaking(pl, PlayerChat.EVENT)) return;
-        LogUtils.debug(`事件:${PlayerCmd.EVENT} 名称:玩家发送聊天消息 参数列表:${[...arguments]} 玩家:${pl.name} 信息:${msg}`);
+        LogUtils.debug(`参数列表:`, ...arguments);
+        LogUtils.debug(`事件:${PlayerChat.EVENT} 名称:玩家发送聊天消息 玩家:${pl.name} 信息:${msg}`);
+        EventProcessor.eventImplsProcess(PlayerCmd, [pl, msg], PlayerChat.EventImplList).catch(err => {
+            LogUtils.error(`${PlayerChat.EVENT}: `, err);
+        });
     }
 }
 
@@ -2772,15 +3048,20 @@ class AfterFinished {
                 regx: {}
             }
         }
-    }
+    };
+
+    static EventImplList = [
+        "defaultImpl"
+    ];
 
     static async process(pl, plData) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
         const EVENT = "AfterFinished";
-        LogUtils.debug(`事件:${EVENT} 名称:完成成就 参数列表${[...arguments]} 玩家:${pl.name} 成就数据:${plData} 成就完成数量:${plData.finished}`);
-        EventProcessor.asyncParallelCall(AfterFinished.defaultImpl(...arguments)).catch(err => {
-            LogUtils.error(`事件:${EVENT}: `, err);
-        })
+        LogUtils.debug(`参数列表:`, ...arguments);
+        LogUtils.debug(`事件:${EVENT} 名称:完成成就 玩家:${pl.name} 成就数据:${plData} 成就完成数量:${plData.finished}`);
+        EventProcessor.eventImplsProcess(AfterFinished, [pl, plData], AfterFinished.EventImplList).catch(err => {
+            LogUtils.error(`${EVENT}: `, err);
+        });
     }
 
 
@@ -2852,17 +3133,43 @@ class EventProcessor {
      * 由Promise.all将所有的返回值收集完毕后，
      * 再由异步遍历器将参数并行循环传入成就处理器中，后续的逻辑处理则交给
      * 成就处理器来完成
-     * @param calls 成就逻辑判别函数的返回值数组
      */
-    static asyncParallelCall(...calls) {
-        return AsyncUtils.iteratorAsync(calls, async (index, options) => {
-            return Utils.isNullOrUndefined(options) ? undefined : AsyncUtils.iteratorAsync([...await options], (index, option) => {
-                return Runtime.achievementManager.process(option);
+    static asyncParallelProcess(promises) {
+        if (promises.length === 0) Promise.reject();
+        return AsyncUtils.iteratorAsync(promises, async (index, options) => {
+            return AsyncUtils.iteratorAsync([...await options], (index, option) => {
+                return AchievementManager.process(option).catch(err => {
+                    throw err;
+                });
             }).catch(err => {
                 throw err;
             });
+        }).catch(err => {
+            if (!Utils.isNullOrUndefined(err)) throw err;
         });
     }
+
+    /**
+     * 收集Promise
+     * @param context
+     * @param args
+     * @param impls
+     */
+    static collectPromiseCall(context, args, impls) {
+        return impls.map(func => context[func].apply(context, args));
+    }
+
+    /**
+     * 调度该事件的所有逻辑处理，并异步将结果发送给成就处理器
+     * @param context
+     * @param args
+     * @param impls
+     * @returns {Promise<Awaited<*>[]>}
+     */
+    static eventImplsProcess(context, args, impls) {
+        return this.asyncParallelProcess(this.collectPromiseCall(context, args, impls));
+    }
+
 
     /**
      * 注册注册所有事件
