@@ -1099,7 +1099,6 @@ class Configuration {
         Runtime.config = config;
         Runtime.displayManger = DisplayManager.assign(Runtime.config.display);
         Runtime.rewardManager = RewardManager.assign(Runtime.config.reward);
-        Runtime.achievementManager = AchievementManager.assign({});
     }
 
 
@@ -1720,13 +1719,6 @@ class Achievement {
  */
 class AchievementManager {
 
-    constructor() {
-    }
-
-    static assign(obj) {
-        return Object.assign(new AchievementManager(), obj);
-    }
-
     /**
      * 判断玩家是否完成某个成就
      */
@@ -1892,13 +1884,11 @@ class Join {
         const type = "special";
         const key = "join";
         if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
-        return [
-            {
-                pl,
-                type,
-                key
-            }
-        ];
+        return {
+            pl,
+            type,
+            key
+        };
     }
 
 }
@@ -2047,11 +2037,11 @@ class Destroy {
         const type = "destroyBlock";
         if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         EventProcessor.antiEventShake(pl, type);
-        return [{
+        return {
             pl,
             type,
             key: bl.type
-        }];
+        };
     }
 }
 
@@ -2162,11 +2152,11 @@ class PlDie {
         const type = "death";
         const key = source.type;
         if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
-        return [{
+        return {
             pl,
             type,
             key
-        }];
+        };
     }
 }
 
@@ -2251,11 +2241,11 @@ class MobDie {
         if (!(source = Utils.toPlayer(source))) return;
         if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         EventProcessor.antiEventShake(source, type);
-        return [{
+        return {
             pl: source,
             type,
             key: mob.type
-        }];
+        };
     }
 }
 
@@ -2288,7 +2278,6 @@ class ScoreChange {
     };
 
     static EventImplList = [
-        "defaultImpl",
         "scoreMoneyImpl"
     ];
 
@@ -2317,8 +2306,8 @@ class ScoreChange {
      * @returns {Promise<*[]>}
      */
     static async defaultImpl(pl, num, name) {
+        LogUtils.debug("进入defaultImpl");
         if (Utils.isShaking(pl, ScoreChange.EVENT)) return Promise.reject();
-
         let entryType = LangManager.getAchievementEntryType(name);
         if (!entryType) return Promise.reject();
         let type = name;
@@ -2328,21 +2317,27 @@ class ScoreChange {
         if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         //如果变化计分板名称是配置中所设置的经济计分板 且开启了配置中经济配置方式为计分板
         let key = undefined;
-        let res = [];
         for (let exp in entryType.details) {
             key = exp;
-            //如果该成就已完成则跳过
-            if (Runtime.achievementManager.judgeAchievement(pl, type, key)) continue;
-            let expRes = Utils.parseStrBoolExp(exp, num);
+            let expRes;
+            const expCacheKey = `${exp}-${num}`;
+
+            if (RuntimeCache.has(expCacheKey)) {
+                continue;
+            } else {
+                expRes = Utils.parseStrBoolExp(exp, num);
+            }
+
+            LogUtils.debug(exp, "finished");
+
             if (expRes) {
-                res.push({
+                return {
                     pl,
                     type,
                     key
-                });
+                };
             }
         }
-        return res;
     }
 
     /**
@@ -2489,11 +2484,11 @@ class InventoryChange {
         if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         EventProcessor.antiEventShake(pl, type);
         if (newItem.type === "") return Promise.reject();
-        return [{
+        return {
             pl,
             type,
             key: newItem.type
-        }];
+        };
     }
 }
 
@@ -2742,6 +2737,7 @@ class BedEnter {
         let type = "sleep";
         let key = undefined;
         if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
+
         if (pos.y > 200) {
             key = "cloudDream";
         } else if (pos.y < 0) {
@@ -2752,14 +2748,14 @@ class BedEnter {
         if (pl.inRain) {
             key = "rainDream";
         }
+        //睡眠判断
         return BedEnter.asyncSleepValidate(pl).then(res => {
             if (res) {
-                return [{
+                return {
                     pl,
                     type,
                     key
-                }
-                ];
+                };
             }
         });
     }
@@ -3057,7 +3053,6 @@ class AfterFinished {
     static async process(pl, plData) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
         const EVENT = "AfterFinished";
-        LogUtils.debug(`参数列表:`, ...arguments);
         LogUtils.debug(`事件:${EVENT} 名称:完成成就 玩家:${pl.name} 成就数据:${plData} 成就完成数量:${plData.finished}`);
         EventProcessor.eventImplsProcess(AfterFinished, [pl, plData], AfterFinished.EventImplList).catch(err => {
             LogUtils.error(`${EVENT}: `, err);
@@ -3072,14 +3067,13 @@ class AfterFinished {
             let key = count;
             count = Number.parseInt(count);
             if (plData.finished > count) {
-                res.push({
+                return {
                     pl,
                     type,
                     key
-                });
+                };
             }
         }
-
         return res;
     }
 }
@@ -3129,19 +3123,14 @@ class EventProcessor {
      * type - 成就类型，基本等于监听事件的名称
      * key - 即触发器类型，如在物品栏变化事件中获得了物品工作台触发了此成就，工作台物品的type就是触发器
      * 因为考虑到很多时候一个事件监听中不同成就可能有不同的实现逻辑
-     * 异步函数的返回值必须是Promise<[{pl, type, key}]>
+     * 异步函数的返回值必须是Promise<{pl, type, key}>
      * 由Promise.all将所有的返回值收集完毕后，
      * 再由异步遍历器将参数并行循环传入成就处理器中，后续的逻辑处理则交给
      * 成就处理器来完成
      */
     static asyncParallelProcess(promises) {
-        if (promises.length === 0) Promise.reject();
-        return AsyncUtils.iteratorAsync(promises, async (index, options) => {
-            return AsyncUtils.iteratorAsync([...await options], (index, option) => {
-                return AchievementManager.process(option).catch(err => {
-                    throw err;
-                });
-            }).catch(err => {
+        return AsyncUtils.iteratorAsync(promises, async (index, processRes) => {
+            return AchievementManager.process(await processRes).catch(err => {
                 throw err;
             });
         }).catch(err => {
