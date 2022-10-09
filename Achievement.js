@@ -1848,8 +1848,7 @@ class Join {
      * @returns [{Promise<{pl, type: string, key: string}>}]
      */
     static async defaultImpl(pl) {
-        LogUtils.debug("jonin inininini");
-        const type = "special";
+        const type = SpecialType.TYPE;
         const key = "join";
         if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         return {
@@ -2249,115 +2248,11 @@ class ScoreChange {
 
 }
 
-class NumberChange {
 
-    static EVENT = "numberChange";
-
-    static EventImplList = ["numberChangeImpl"];
-
-
-    static numberChangeImpl(pl, type, num, multipart = false) {
-        if (Utils.hasNullOrUndefined(...arguments)) return;
-        EventProcessor.eventImplsProcess(NumberChange, [pl, type, num, multipart], NumberChange.EventImplList).catch(err => {
-            LogUtils.error(`${NumberChange.EVENT}: `, err);
-        });
-    }
-
-    /**
-     * 默认实现
-     * @param pl
-     * @param type
-     * @param num
-     * @param multipart
-     * @returns {Promise<never>|Promise<*[]>|Promise<{pl, type, key: string}>}
-     */
-    static defaultImpl(pl, type, num, multipart) {
-        //防抖
-        if (Utils.isShaking(pl, type)) return Promise.reject();
-        //计分板防抖
-        EventProcessor.antiEventShake(pl, type);
-        //获取词条类型
-        let entryType = LangManager.getAchievementEntryType(type);
-        //判断对应数字类型的成就是否存在或者是否启用
-        if (!entryType || !entryType.enable) return Promise.reject();
-        //最后进行数字逻辑处理
-        return multipart ? NumberChange.multipartImpl(pl, type, num, entryType) : NumberChange.singleImpl(pl, type, num, entryType);
-    }
-
-
-    /**
-     * 一次逻辑只会触发一个值
-     * @param pl
-     * @param type
-     * @param num
-     * @param entryType
-     * @returns {Promise<{pl, type, key: string}>}
-     */
-    static async singleImpl(pl, type, num, entryType) {
-        for (let boolExp in entryType.details) {
-            if (NumberChange.calculateExp(type, boolExp, num)) {
-                return {
-                    pl, type, key: boolExp
-                };
-            }
-        }
-    }
-
-    /**
-     * 一次逻辑会触发多个值
-     * @param pl
-     * @param type
-     * @param num
-     * @param entryType
-     * @returns {Promise<*[]>}
-     */
-    static async multipartImpl(pl, type, num, entryType) {
-        let res = [];
-        let key = undefined;
-        for (let boolExp in entryType.details) {
-            key = boolExp;
-            if (NumberChange.calculateExp(type, boolExp, num)) {
-                res.push({pl, type, key: boolExp});
-            }
-        }
-        return res;
-    }
-
-    /**
-     * 获取数字缓存key
-     * @param type
-     * @param exp
-     * @param num
-     * @returns {string}
-     */
-    static getNumCacheKey(type, exp, num) {
-        return `num-${type}-${exp}-${num}`;
-    }
-
-    /**
-     * 计算表达式
-     * @param type
-     * @param boolExp
-     * @param num
-     * @returns {boolean}
-     */
-    static calculateExp(type, boolExp, num) {
-        let expRes;
-        //获取缓存key
-        let expCacheKey = NumberChange.getNumCacheKey(type, boolExp, num);
-        //如果击中缓存，直接从缓存中读取
-        if (RuntimeCache.has(expCacheKey)) {
-            expRes = RuntimeCache.getCache(expCacheKey);
-        } else {//未击中缓存则计算表达式
-            expRes = Utils.parseStrBoolExp(boolExp, num);
-        }
-        return expRes;
-    }
-
-}
-
+/**
+ * 消耗图腾
+ */
 class ConsumeTotem {
-
 
     /**
      * 消耗图腾
@@ -2368,12 +2263,15 @@ class ConsumeTotem {
     static ENTRY = {
         zh_CN: {
             special: {
-                name: "特殊成就", details: {}
+                name: "特殊成就",
+                details: {
+                    "useTotem": new Achievement("大难不死，必有后福", "在濒临死亡时使用图腾")
+                }
             }
         }, en_US: {}
     };
 
-    static EventImplList = ["defaultImpl",];
+    static EventImplList = ["defaultImpl"];
 
     /**
      * 消耗图腾
@@ -2391,7 +2289,7 @@ class ConsumeTotem {
 
     static defaultImpl(pl) {
         return {
-            pl, type: this.EVENT, key: EventProcessor.INDEX
+            pl, type: SpecialType.TYPE, key: "useTotem"
         };
     }
 }
@@ -2513,7 +2411,7 @@ class UseBucketTake {
 
 
     static defaultImpl(pl, item, target) {
-        const type = "special";
+        const type = SpecialType.TYPE;
         if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         return {
             pl, type: this.EVENT, key: target.type
@@ -2997,6 +2895,194 @@ class AfterFinished {
     }
 }
 
+class NumberChange {
+
+    static EVENT = "numberChange";
+
+    static EventImplList = ["numberChangeImpl"];
+
+
+    static numberChangeImpl(pl, type, num, multipart = false) {
+        if (Utils.hasNullOrUndefined(...arguments)) return;
+        EventProcessor.eventImplsProcess(NumberChange, [pl, type, num, multipart], NumberChange.EventImplList).catch(err => {
+            LogUtils.error(`${NumberChange.EVENT}: `, err);
+        });
+    }
+
+    /**
+     * 默认实现
+     * @param pl
+     * @param type
+     * @param num
+     * @param multipart
+     * @returns {Promise<never>|Promise<*[]>|Promise<{pl, type, key: string}>}
+     */
+    static defaultImpl(pl, type, num, multipart) {
+        //防抖
+        if (Utils.isShaking(pl, type)) return Promise.reject();
+        //计分板防抖
+        EventProcessor.antiEventShake(pl, type);
+        //获取词条类型
+        let entryType = LangManager.getAchievementEntryType(type);
+        //判断对应数字类型的成就是否存在或者是否启用
+        if (!entryType || !entryType.enable) return Promise.reject();
+        //最后进行数字逻辑处理
+        return multipart ? NumberChange.multipartImpl(pl, type, num, entryType) : NumberChange.singleImpl(pl, type, num, entryType);
+    }
+
+
+    /**
+     * 一次逻辑只会触发一个值
+     * @param pl
+     * @param type
+     * @param num
+     * @param entryType
+     * @returns {Promise<{pl, type, key: string}>}
+     */
+    static async singleImpl(pl, type, num, entryType) {
+        for (let boolExp in entryType.details) {
+            if (NumberChange.calculateExp(type, boolExp, num)) {
+                return {
+                    pl, type, key: boolExp
+                };
+            }
+        }
+    }
+
+    /**
+     * 一次逻辑会触发多个值
+     * @param pl
+     * @param type
+     * @param num
+     * @param entryType
+     * @returns {Promise<*[]>}
+     */
+    static async multipartImpl(pl, type, num, entryType) {
+        let res = [];
+        let key = undefined;
+        for (let boolExp in entryType.details) {
+            key = boolExp;
+            if (NumberChange.calculateExp(type, boolExp, num)) {
+                res.push({pl, type, key: boolExp});
+            }
+        }
+        return res;
+    }
+
+    /**
+     * 获取数字缓存key
+     * @param type
+     * @param exp
+     * @param num
+     * @returns {string}
+     */
+    static getNumCacheKey(type, exp, num) {
+        return `num-${type}-${exp}-${num}`;
+    }
+
+    /**
+     * 计算表达式
+     * @param type
+     * @param boolExp
+     * @param num
+     * @returns {boolean}
+     */
+    static calculateExp(type, boolExp, num) {
+        let expRes;
+        //获取缓存key
+        let expCacheKey = NumberChange.getNumCacheKey(type, boolExp, num);
+        //如果击中缓存，直接从缓存中读取
+        if (RuntimeCache.has(expCacheKey)) {
+            expRes = RuntimeCache.getCache(expCacheKey);
+        } else {//未击中缓存则计算表达式
+            expRes = Utils.parseStrBoolExp(boolExp, num);
+        }
+        return expRes;
+    }
+
+}
+
+class StringEqual {
+
+    static EVENT = "stringEqual";
+
+    static EventImplList = ["defaultImpl"];
+
+    static stringEqualImpl(pl, type, key) {
+        if (Utils.hasNullOrUndefined(...arguments)) return;
+        if (Utils.isShaking(pl, type)) return;
+        EventProcessor.antiEventShake(pl, type);
+        EventProcessor.eventImplsProcess(StringEqual, [pl, type, key], StringEqual.EventImplList).catch(err => {
+            LogUtils.error(`${StringEqual.EVENT}: `, err);
+        });
+    }
+
+    /**
+     * 十分简单的逻辑，不能再简单了
+     * @param pl
+     * @param type
+     * @param key
+     * @returns {{pl, type, key}}
+     */
+    static async defaultImpl(pl, type, key) {
+        return {
+            pl, type, key
+        };
+    }
+}
+
+class SpecialType {
+
+    static EVENT = "specialEvent";
+
+    static TYPE = "special";
+
+    static specialImpl(pl, key, isNum = false, multipart = false) {
+        if (Utils.hasNullOrUndefined(...arguments)) return;
+        if (Utils.isShaking(pl, SpecialType.TYPE)) return;
+        EventProcessor.antiEventShake(pl, SpecialType.TYPE);
+        EventProcessor.eventImplsProcess(StringEqual, [pl, key, isNum, multipart], StringEqual.EventImplList).catch(err => {
+            LogUtils.error(`${SpecialType.EVENT}: `, err);
+        });
+    }
+
+    /**
+     * 默认实现
+     * @param pl
+     * @param key
+     * @param isNum
+     * @param multipart
+     * @returns {Promise<*[]|{pl, type, key: string}>|{pl, type, key}}
+     */
+    static defaultImpl(pl, key, isNum, multipart) {
+        return isNum ? SpecialType.defaultNumberImpl(pl, SpecialType.TYPE, key, multipart) : SpecialType.defaultStringImpl(pl, SpecialType.TYPE, key);
+    }
+
+    /**
+     * 字符串成就实现
+     * @param pl
+     * @param type
+     * @param key
+     * @returns {{pl, type, key}}
+     */
+    static async defaultStringImpl(pl, type, key) {
+        return StringEqual.defaultImpl(pl, type, key);
+    }
+
+
+    /**
+     * 数字成就实现
+     * @param pl
+     * @param type
+     * @param num
+     * @param multipart
+     * @returns {Promise<*[]|{pl, type, key: string}>}
+     */
+    static async defaultNumberImpl(pl, type, num, multipart) {
+        return NumberChange.defaultImpl(pl, type, num, multipart);
+    }
+
+}
 
 /**
  * 事件监听回调处理器
