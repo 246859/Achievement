@@ -1287,7 +1287,7 @@ class PlDataManager {
      * @returns {undefined|*}
      */
     static getPlAchiInfo(xuid) {
-        if (xuid) return this.plData[xuid]; else return undefined;
+        if (!Utils.isNullOrUndefined(xuid)) return this.plData[xuid]; else return undefined;
     }
 
     /**
@@ -1297,7 +1297,7 @@ class PlDataManager {
      * @returns {boolean}
      */
     static setPlAchiInfo(xuid, obj) {
-        if (xuid) {
+        if (!Utils.isNullOrUndefined(xuid)) {
             return this.getPlData()[xuid] = obj;
         } else return false;
     }
