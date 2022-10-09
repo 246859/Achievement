@@ -5,8 +5,7 @@
  */
 
 const PLUGINS_INFO = {
-    name: "Achievement",
-    version: "v2.0.0",
+    name: "Achievement", version: "v2.0.0",
 };
 
 const ZH_CN = "zh_CN";
@@ -27,36 +26,29 @@ const DEFAULT_CONFIG = {
         scope: 2,//作用范围 2所有人都能看到，1仅个人能看到，0不展示
         toast: {//成就弹窗
             enable: true
-        },
-        beep: {//提示音
-            enable: true,
-            type: "random.toast",//提示音类型
+        }, beep: {//提示音
+            enable: true, type: "random.toast",//提示音类型
             volume: 5, //音量
             pitchArray: [0.3, 1, 1.5]//音调数组
-        },
-        chatBar: {//聊天栏展示
+        }, chatBar: {//聊天栏展示
             enable: true
         }
-    },
-    reward: {//成就完成奖励
+    }, reward: {//成就完成奖励
         economy: {//经济奖励
             enable: true,//是否开启
             type: "score",//经济类型 score | llmoney
             score: "money",//计分板名称
             value: 50,//要增加的经济值
-        },
-        exp: {//经验奖励
+        }, exp: {//经验奖励
             enable: true,//是否开启
             value: 50//要增加的经验值
-        },
-        item: {
+        }, item: {
             enable: true,//是否开启
             type: "minecraft:cooked_beef",//熟牛肉
             count: 1,//数量
             lore: ["成就奖励物品"]//物品lore
         }
-    },
-    antiShake: 400, //防抖粒度
+    }, antiShake: 400, //防抖粒度
     checkUpdate: true,//检查更新
     debug: true//调试模式
 };
@@ -67,18 +59,15 @@ const DEFAULT_CONFIG = {
  */
 const LANG = {
     zh_CN: {
-        Entry: {},
-        Menu: {
+        Entry: {}, Menu: {
             display: {
                 toastTitle: "§l§a${title}",
                 toastMsg: "§3${msg}",
                 chatBar: "§l§6[ACHIEVEMENT]§r §e玩家 ${name} §c获得成就 §a${entry}§3 ———— ${condition}"
             }
         }
-    },
-    en_US: {
-        Entry: {},
-        Menu: {}
+    }, en_US: {
+        Entry: {}, Menu: {}
     }
 };
 
@@ -88,16 +77,11 @@ const LANG = {
  */
 
 const Constant = {
-    version: "achi_version",
-    moneyType: {
-        score: "score",
-        llmoney: "llmoney"
-    },
-    langType: {
-        zh_CN: "zh_CN",
-        en_US: "en_US"
-    },
-    SystemInfo: {
+    version: "achi_version", moneyType: {
+        score: "score", llmoney: "llmoney"
+    }, langType: {
+        zh_CN: "zh_CN", en_US: "en_US"
+    }, SystemInfo: {
         zh_CN: {
             achi: {
                 enter: "玩家:${pl.name} 触发事件:${type} Key:${key}",
@@ -107,19 +91,16 @@ const Constant = {
                 update: "成就状态修改成功",
                 exist: "存在该成就词条",
                 nonExistentEntry: "不存在的成就词条",
-            },
-            reward: {
+            }, reward: {
                 economyInfo: "经济奖励 对象: ${pl.name} 类型: ${economy.type} 数值: ${economy.value}",
                 itemInfo: "物品奖励 对象: ${pl.name} 类型: ${item.type} 数量:${item.count} 词条:${item.lore}",
                 expInfo: "经验奖励 对象 ${pl.name} 数值: ${exp.value}",
                 nonExistentScore: "经济计分板项<${score}>不存在,请确认是否填写错误",
-            },
-            display: {
+            }, display: {
                 chatBar: "聊天栏展示 作用域: ${scope} 对象: ${pl.name} 信息:${finalMsg}",
                 toast: "弹窗展示 对象: ${pl.name} 标题: ${title} 信息: ${msg}",
                 beep: "提示音展示 对象: ${pl.name} 类型: ${beep.type} 音量: ${beep.volume} 音调: ${randomPitch}"
-            },
-            init: {
+            }, init: {
                 dirInit: "插件目录创建完成",
                 data: "玩家数据文件创建完成",
                 config: "插件配置文件创建完成",
@@ -138,14 +119,12 @@ const Constant = {
                 initialData: "初始运行时数据: ${}",
                 initEntryCount: "成就插件成功加载,总计${}种成就类型,${}个成就词条,${}个事件监听",
                 initError: "插件启动异常: "
-            },
-            IO: {
+            }, IO: {
                 readJsonNull: "路径: ${path} JSON读取为: ${buffer}",
                 readJsonError: "路径: ${path} JSON读取异常: ",
                 writeJsonError: "路径: ${path} JSON写入异常: "
             },
-        },
-        en_US: {
+        }, en_US: {
             achi: {
                 enter: "Player:${pl.name} Triggered Event:${type} Key:${key}",
                 args: "Parameter verification passed",
@@ -153,19 +132,16 @@ const Constant = {
                 status: "Achievement status not completed",
                 update: "Achievement status modified successfully",
                 nonExistentEntry: "Achievement entry that does not exist",
-            },
-            reward: {
+            }, reward: {
                 economyInfo: "Economy Reward Object: ${pl.name} Type: ${economy.type} Value: ${economy.value}",
                 itemInfo: "Item Reward Object: ${pl.name} Type: ${item.type} Quantity: ${item.count} Item: ${item.lore}",
                 expInfo: "Experience reward object ${pl.name} value: ${exp.value}",
                 nonExistentScore: "The economic scoreboard item <${score}> does not exist, please confirm whether the entry is incorrect",
-            },
-            display: {
+            }, display: {
                 chatBar: "Chat Bar Display Scope: ${scope} Object: ${pl.name} Information: ${finalMsg}",
                 toast: "Popup display object: ${pl.name} title: ${title} information: ${msg}",
                 beep: "Beep Display Object: ${pl.name} Type: ${beep.type} Volume: ${beep.volume} Pitch: ${randomPitch}"
-            },
-            init: {
+            }, init: {
                 dirInit: "The plugin directory is created",
                 data: "Player data file created",
                 config: "The plugin configuration file is created",
@@ -182,8 +158,7 @@ const Constant = {
                 initialData: "Initial runtime data: ${}",
                 initEntryCount: "Successfully loaded ${} achievement types, with a total of ${} achievement entries",
                 initError: "Plugin startup exception: "
-            },
-            IO: {
+            }, IO: {
                 readJsonNull: "Path: ${path} JSON read as: ${buffer}",
                 readJsonError: "Path: ${path} JSON read exception: ",
                 writeJsonError: "path: ${path} JSON write exception: "
@@ -483,8 +458,7 @@ class Utils {
      * @returns {*|Player|undefined}
      */
     static toPlayer(en) {
-        if (en.isPlayer()) return en.toPlayer();
-        else return undefined;
+        if (en.isPlayer()) return en.toPlayer(); else return undefined;
     }
 
     /**
@@ -656,8 +630,7 @@ class LogUtils {
      * @param msg
      */
     static debugBroadcast(msg) {
-        if (Runtime.config.debug)
-            mc.broadcast(`${Format.Red}[${this.DEBUG}] ${msg}`, this.CHAT);
+        if (Runtime.config.debug) mc.broadcast(`${Format.Red}[${this.DEBUG}] ${msg}`, this.CHAT);
     }
 
     /**
@@ -781,8 +754,7 @@ class LangManager {
      */
     static collectEntry() {
         let entry = {
-            zh_CN: {},
-            en_US: {}
+            zh_CN: {}, en_US: {}
         };
         //记录成就类型数量
         EventProcessor.EVENT_PROCESSOR_LIST.forEach(processor => {
@@ -838,8 +810,7 @@ class LangManager {
      * @returns {*}
      */
     static eqMatch(type, key) {
-        if (this.getAchievementEntryType(type).details[key]) return key;
-        else return undefined;
+        if (this.getAchievementEntryType(type).details[key]) return key; else return undefined;
     }
 
     /**
@@ -872,8 +843,7 @@ class LangManager {
      */
     static getAchievementEntryType(type) {
         let entryType = Runtime.entry[type];
-        if (!entryType) return undefined;
-        else return entryType;
+        if (!entryType) return undefined; else return entryType;
     }
 
     /**
@@ -881,8 +851,7 @@ class LangManager {
      */
     static getAchievementEntry(type, key) {
         let achiType = this.getAchievementEntryType(type);
-        if (achiType) return achiType.details[key];
-        else return undefined;
+        if (achiType) return achiType.details[key]; else return undefined;
     }
 
 
@@ -1048,16 +1017,14 @@ class PersistentCache {
     }
 
     static set(key, val) {
-        if (typeof key === "string") this.cacheMap[key] = val;
-        else throw new Error("错误的key数据类型");
+        if (typeof key === "string") this.cacheMap[key] = val; else throw new Error("错误的key数据类型");
         this.save().catch(err => {
             LogUtils.error("缓存数据保存失败: ", err);
         });
     }
 
     static has(key) {
-        if (key) return this.get(key) == true;
-        else return false;
+        if (key) return this.get(key) == true; else return false;
     }
 
     static remove(key) {
@@ -1302,8 +1269,7 @@ class PlDataManager {
      * @returns {undefined|*}
      */
     static getPlAchiInfo(xuid) {
-        if (xuid) return this.plData[xuid];
-        else return undefined;
+        if (xuid) return this.plData[xuid]; else return undefined;
     }
 
     /**
@@ -1452,10 +1418,7 @@ class PlayerAchievement {
         this.status = status;
         this.time = time;
         this.pos = {
-            x: pos.x.toFixed(1),
-            y: pos.y.toFixed(1),
-            z: pos.z.toFixed(1),
-            dim: pos.dim
+            x: pos.x.toFixed(1), y: pos.y.toFixed(1), z: pos.z.toFixed(1), dim: pos.dim
         };
     }
 
@@ -1493,9 +1456,7 @@ class DisplayManager {
      * @type {{PRIVATE_SCOPE: number, NULL_SCOPE: number, PUBLIC_SCOPE: number}}
      */
     SCOPE = {
-        PUBLIC_SCOPE: 2,
-        PRIVATE_SCOPE: 1,
-        NULL_SCOPE: 0
+        PUBLIC_SCOPE: 2, PRIVATE_SCOPE: 1, NULL_SCOPE: 0
     };
 
     /**
@@ -1575,9 +1536,7 @@ class DisplayManager {
     async toastDisplay(pl, entry) {
         if (!this.toast.enable) return;
         LogUtils.debug(Utils.loadTemplate(Runtime.SystemInfo.display.toast, pl.name, entry.msg, entry.condition));
-        return pl.sendToast(
-            Utils.loadTemplate(Runtime.menu.display.toastTitle, entry.msg),
-            Utils.loadTemplate(Runtime.menu.display.toastMsg, entry.condition));
+        return pl.sendToast(Utils.loadTemplate(Runtime.menu.display.toastTitle, entry.msg), Utils.loadTemplate(Runtime.menu.display.toastMsg, entry.condition));
     }
 
     /**
@@ -1757,9 +1716,10 @@ class AchievementManager {
      * @param promises promise数组
      */
     static async process({pl, type, key}) {
-        LogUtils.debug(Utils.loadTemplate(Runtime.SystemInfo.achi.enter, pl.name, type, key));
         //参数校验
         if (Utils.hasNullOrUndefined(pl, type, key)) return Promise.reject();
+        LogUtils.debug(Utils.loadTemplate(Runtime.SystemInfo.achi.enter, pl.name, type, key));
+
         LogUtils.debug(Runtime.SystemInfo.achi.args);
         let triggerName;//有些词条会存在映射，映射得到的最终结果才是词条 即 key -> mapEntry
         //根据key值获取词条真实的触发值
@@ -1789,11 +1749,7 @@ class AchievementManager {
      * @returns {Promise<Awaited<unknown>[]>}
      */
     static async postProcess(pl, entry) {
-        return Promise.all([
-            Runtime.rewardManager.rewardAsync(pl),
-            Runtime.displayManger.displayAchievementAsync(pl, entry),
-            PlDataManager.saveAsync(),
-            AfterFinished.process(pl, PlDataManager.getPlAchiInfo(pl.xuid))//成就达成后的成就
+        return Promise.all([Runtime.rewardManager.rewardAsync(pl), Runtime.displayManger.displayAchievementAsync(pl, entry), PlDataManager.saveAsync(), AfterFinished.process(pl, PlDataManager.getPlAchiInfo(pl.xuid))//成就达成后的成就
         ]);
     }
 
@@ -1843,21 +1799,15 @@ class Join {
     static ENTRY = {
         zh_CN: {
             special: {
-                enable: true,
-                name: "特殊成就",
-                details: {
+                enable: true, name: "特殊成就", details: {
                     join: new Achievement("Hello World!", "首次进入服务器"),
-                },
-                regx: {}
+                }, regx: {}
             }
-        },
-        en_US: {}
+        }, en_US: {}
     };
 
 
-    static EventImplList = [
-        "defaultImpl"
-    ];
+    static EventImplList = ["defaultImpl"];
 
 
     /**
@@ -1885,9 +1835,7 @@ class Join {
         const key = "join";
         if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         return {
-            pl,
-            type,
-            key
+            pl, type, key
         };
     }
 
@@ -1921,24 +1869,18 @@ class ChangeDim {
      */
     static EVENT = "onChangeDim";
 
-    static EventImplList = [
-        "defaultImpl"
-    ];
+    static EventImplList = ["defaultImpl"];
 
     static ENTRY = {
         zh_CN: {
             changeDim: {
-                enable: true,
-                name: "维度成就",
-                details: {
+                enable: true, name: "维度成就", details: {
                     "0": new Achievement("真是美好的世界", "到达主世界"),
                     "1": new Achievement("地狱空空荡荡，魔鬼都在人间", "到达地狱"),
                     "2": new Achievement("永恒、无星暗夜的维度", "到达末地")
-                },
-                regx: {}
+                }, regx: {}
             }
-        },
-        en_US: {}
+        }, en_US: {}
     };
 
     /**
@@ -1960,9 +1902,7 @@ class ChangeDim {
         const type = "changeDim";
         if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         return {
-            pl,
-            type,
-            key: dimid
+            pl, type, key: dimid
         };
     }
 }
@@ -1979,9 +1919,7 @@ class Destroy {
     static ENTRY = {
         zh_CN: {
             destroyBlock: {
-                enable: true,
-                name: "挖掘成就",
-                details: {
+                enable: true, name: "挖掘成就", details: {
                     "minecraft:log": new Achievement("要致富，先撸树!", "首次砍掉原木"),
                     "minecraft:stone": new Achievement("疯狂的石头!", "首次挖掘石头"),
                     "minecraft:coal_ore": new Achievement("满面尘灰烟火色，两鬓苍苍十指黑", "首次挖掘煤矿"),
@@ -2003,19 +1941,15 @@ class Destroy {
                     "minecraft:bee_nest": new Achievement("嗡嗡嗡~ 麻烦来了", "首次破坏蜂巢"),
                     "minecraft:amethyst_block": new Achievement("美丽迷人的紫水晶", "首次破坏紫水晶母岩"),
                     "minecraft:leaves": new Achievement("某瑞典人：How dare you !", "首次剪掉树叶"),
-                },
-                regx: {
+                }, regx: {
                     "minecraft:log": "minecraft:log"
                 }
             },
 
-        },
-        en_US: {}
+        }, en_US: {}
     };
 
-    static EventImplList = [
-        "defaultImpl"
-    ];
+    static EventImplList = ["defaultImpl"];
 
     /**
      * 玩家破坏方块完成
@@ -2038,9 +1972,7 @@ class Destroy {
         if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         EventProcessor.antiEventShake(pl, type);
         return {
-            pl,
-            type,
-            key: bl.type
+            pl, type, key: bl.type
         };
     }
 }
@@ -2057,18 +1989,12 @@ class Place {
     static ENTRY = {
         zh_CN: {
             place: {
-                enable: true,
-                name: "放置成就",
-                details: {},
-                regx: {}
+                enable: true, name: "放置成就", details: {}, regx: {}
             }
-        },
-        en_US: {}
+        }, en_US: {}
     };
 
-    static EventImplList = [
-        "defaultImpl"
-    ];
+    static EventImplList = ["defaultImpl"];
 
     static process(pl, bl) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
@@ -2095,9 +2021,7 @@ class PlDie {
     static ENTRY = {
         zh_CN: {
             death: {
-                enable: true,
-                name: "死亡成就",
-                details: {
+                enable: true, name: "死亡成就", details: {
                     "minecraft:creeper": new Achievement("突如其来的惊喜!", "死于苦力怕"),
                     "minecraft:zombie": new Achievement("倒在了尸潮中", "死于僵尸"),
                     "minecraft:skeleton": new Achievement("中门对狙", "死于小白"),
@@ -2128,16 +2052,12 @@ class PlDie {
                     "minecraft:player": new Achievement("死于谋杀", "死于玩家"),
                     "minecraft:dolphin": new Achievement("因果报应", "死于海豚"),
                     "minecraft:panda": new Achievement("功夫熊猫", "死于熊猫"),
-                },
-                regx: {}
+                }, regx: {}
             }
-        },
-        en_US: {}
+        }, en_US: {}
     };
 
-    static EventImplList = [
-        "defaultImpl"
-    ];
+    static EventImplList = ["defaultImpl"];
 
     static process(pl, source) {
         LogUtils.debug([...arguments]);
@@ -2153,9 +2073,7 @@ class PlDie {
         const key = source.type;
         if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         return {
-            pl,
-            type,
-            key
+            pl, type, key
         };
     }
 }
@@ -2171,9 +2089,7 @@ class MobDie {
     static ENTRY = {
         zh_CN: {
             killer: {
-                enable: true,
-                name: "击杀成就",
-                details: {
+                enable: true, name: "击杀成就", details: {
                     "minecraft:creeper": new Achievement("嘶~嘶~", "首次击杀苦力怕"),
                     "minecraft:zombie": new Achievement("僵尸围城", "首次击杀僵尸"),
                     "minecraft:skeleton": new Achievement("东风快递,使命必达", "首次击杀小白"),
@@ -2209,16 +2125,12 @@ class MobDie {
                     "minecraft:pig": new Achievement("挺像你的", "首次击杀猪"),
                     "minecraft:cow": new Achievement("勇敢牛牛，不怕困难", "首次击杀牛"),
                     "minecraft:villager_v2": new Achievement("死不足惜", "首次击杀村民")
-                },
-                regx: {}
+                }, regx: {}
             },
-        },
-        en_US: {}
+        }, en_US: {}
     };
 
-    static EventImplList = [
-        "defaultImpl"
-    ];
+    static EventImplList = ["defaultImpl"];
 
     /**
      * 生物死亡
@@ -2242,9 +2154,7 @@ class MobDie {
         if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         EventProcessor.antiEventShake(source, type);
         return {
-            pl: source,
-            type,
-            key: mob.type
+            pl: source, type, key: mob.type
         };
     }
 }
@@ -2260,9 +2170,7 @@ class ScoreChange {
     static ENTRY = {
         zh_CN: {
             "ScoreMoney": {
-                enable: true,
-                name: "经济成就",
-                details: {
+                enable: true, name: "经济成就", details: {
                     "${}<=0": new Achievement("大负翁", "经济小于等于0"),
                     "${}>=1000": new Achievement("低保生活", "经济大于等于1k"),
                     "${}>=10000": new Achievement("卑微社畜", "经济大于等于1w"),
@@ -2270,16 +2178,12 @@ class ScoreChange {
                     "${}>=1000000": new Achievement("百万富翁", "经济大于等于100w"),
                     "${}>=10000000": new Achievement("千万富翁", "经济大于等于1000w"),
                     "${}>=100000000": new Achievement("亿万富翁", "经济大于等于10000w")
-                },
-                regx: {}
+                }, regx: {}
             },
-        },
-        en_US: {}
+        }, en_US: {}
     };
 
-    static EventImplList = [
-        "scoreMoneyImpl"
-    ];
+    static EventImplList = ["scoreMoneyImpl"];
 
     /**
      * 计分板变化
@@ -2303,10 +2207,9 @@ class ScoreChange {
      * @param pl
      * @param num
      * @param name
-     * @returns {Promise<*[]>}
+     * @returns {Promise<{pl, type, key}>}
      */
     static async defaultImpl(pl, num, name) {
-        LogUtils.debug("进入defaultImpl");
         if (Utils.isShaking(pl, ScoreChange.EVENT)) return Promise.reject();
         let entryType = LangManager.getAchievementEntryType(name);
         if (!entryType) return Promise.reject();
@@ -2316,25 +2219,20 @@ class ScoreChange {
         //成就是否启用
         if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         //如果变化计分板名称是配置中所设置的经济计分板 且开启了配置中经济配置方式为计分板
-        let key = undefined;
         for (let exp in entryType.details) {
-            key = exp;
+            let key = exp;
             let expRes;
             const expCacheKey = `${exp}-${num}`;
 
             if (RuntimeCache.has(expCacheKey)) {
-                continue;
+                expRes = RuntimeCache.getCache(expCacheKey);
             } else {
                 expRes = Utils.parseStrBoolExp(exp, num);
             }
 
-            LogUtils.debug(exp, "finished");
-
             if (expRes) {
                 return {
-                    pl,
-                    type,
-                    key
+                    pl, type, key
                 };
             }
         }
@@ -2370,16 +2268,12 @@ class ConsumeTotem {
     static ENTRY = {
         zh_CN: {
             special: {
-                name: "特殊成就",
-                details: {}
+                name: "特殊成就", details: {}
             }
-        },
-        en_US: {}
+        }, en_US: {}
     };
 
-    static EventImplList = [
-        "defaultImpl",
-    ];
+    static EventImplList = ["defaultImpl",];
 
     /**
      * 消耗图腾
@@ -2397,9 +2291,7 @@ class ConsumeTotem {
 
     static defaultImpl(pl) {
         return {
-            pl,
-            type: this.EVENT,
-            key: EventProcessor.INDEX
+            pl, type: this.EVENT, key: EventProcessor.INDEX
         };
     }
 }
@@ -2415,9 +2307,7 @@ class InventoryChange {
     static ENTRY = {
         zh_CN: {
             itemObtain: {
-                enable: true,
-                name: "物品成就",
-                details: {
+                enable: true, name: "物品成就", details: {
                     "minecraft:furnace": new Achievement("聊的火热!", "首次获得熔炉"),
                     "minecraft:crafting_table": new Achievement("工作时间到！", "首次获得工作台"),
                     "minecraft:torch": new Achievement("照亮前进的道路!", "首次获得火把"),
@@ -2449,16 +2339,12 @@ class InventoryChange {
                     "minecraft:clock": new Achievement("进服送终", "首次获得时钟"),
                     "minecraft:fishing_rod": new Achievement("孤舟蓑笠翁,独钓寒江雪", "首次获得钓鱼竿"),
                     "minecraft:map": new Achievement("缺德地图,竭诚为您导航", "首次获得地图"),
-                },
-                regx: {}
+                }, regx: {}
             }
-        },
-        en_US: {}
+        }, en_US: {}
     };
 
-    static EventImplList = [
-        "defaultImpl",
-    ];
+    static EventImplList = ["defaultImpl",];
 
     /**
      * 物品栏变化
@@ -2485,9 +2371,7 @@ class InventoryChange {
         EventProcessor.antiEventShake(pl, type);
         if (newItem.type === "") return Promise.reject();
         return {
-            pl,
-            type,
-            key: newItem.type
+            pl, type, key: newItem.type
         };
     }
 }
@@ -2504,16 +2388,12 @@ class UseBucketTake {
     static ENTRY = {
         zh_CN: {
             special: {
-                name: "特殊成就",
-                details: {}
+                name: "特殊成就", details: {}
             }
-        },
-        en_US: {}
+        }, en_US: {}
     };
 
-    static EventImplList = [
-        "defaultImpl",
-    ];
+    static EventImplList = ["defaultImpl",];
 
     /**
      * 使用桶装东西
@@ -2536,9 +2416,7 @@ class UseBucketTake {
         const type = "special";
         if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         return {
-            pl,
-            type: this.EVENT,
-            key: target.type
+            pl, type: this.EVENT, key: target.type
         };
     }
 }
@@ -2554,16 +2432,12 @@ class DropItem {
     static ENTRY = {
         zh_CN: {
             special: {
-                name: "特殊成就",
-                details: {}
+                name: "特殊成就", details: {}
             }
-        },
-        en_US: {}
+        }, en_US: {}
     };
 
-    static EventImplList = [
-        "defaultImpl",
-    ];
+    static EventImplList = ["defaultImpl",];
 
     /**
      * 丢出物品
@@ -2582,9 +2456,7 @@ class DropItem {
 
     static defaultImpl(pl, item) {
         return {
-            pl,
-            type: this.EVENT,
-            key: item.type
+            pl, type: this.EVENT, key: item.type
         };
     }
 }
@@ -2600,16 +2472,12 @@ class Eat {
     static ENTRY = {
         zh_CN: {
             eat: {
-                name: "食物成就",
-                details: {}
+                name: "食物成就", details: {}
             }
-        },
-        en_US: {}
+        }, en_US: {}
     };
 
-    static EventImplList = [
-        "defaultImpl",
-    ];
+    static EventImplList = ["defaultImpl",];
 
     /**
      * 食用食物
@@ -2628,9 +2496,7 @@ class Eat {
 
     static default(pl, item) {
         return {
-            pl,
-            type: this.EVENT,
-            key: item.type
+            pl, type: this.EVENT, key: item.type
         };
     }
 }
@@ -2646,16 +2512,12 @@ class ArmorSet {
     static ENTRY = {
         zh_CN: {
             armor: {
-                name: "装备成就",
-                details: {}
+                name: "装备成就", details: {}
             }
-        },
-        en_US: {}
+        }, en_US: {}
     };
 
-    static EventImplList = [
-        "defaultImpl",
-    ];
+    static EventImplList = ["defaultImpl",];
 
 
     /**
@@ -2693,23 +2555,17 @@ class BedEnter {
     static ENTRY = {
         zh_CN: {
             sleep: {
-                enable: true,
-                name: "睡眠成就",
-                details: {
+                enable: true, name: "睡眠成就", details: {
                     "cloudDream": new Achievement("云端之梦", "在云层之上睡一晚上"),
                     "undergroundDream": new Achievement("深渊之息", "在洞穴层睡一晚上"),
                     "normalDream": new Achievement("精神饱满", "安全的睡一晚上"),
                     "rainDream": new Achievement("屋漏偏逢连夜雨", "在雨中睡一晚上")
-                },
-                regx: {}
+                }, regx: {}
             }
-        },
-        en_US: {}
+        }, en_US: {}
     };
 
-    static EventImplList = [
-        "defaultImpl",
-    ];
+    static EventImplList = ["defaultImpl",];
 
     /**
      * 玩家上床
@@ -2752,9 +2608,7 @@ class BedEnter {
         return BedEnter.asyncSleepValidate(pl).then(res => {
             if (res) {
                 return {
-                    pl,
-                    type,
-                    key
+                    pl, type, key
                 };
             }
         });
@@ -2805,16 +2659,12 @@ class Ride {
     static ENTRY = {
         zh_CN: {
             ride: {
-                name: "骑乘成就",
-                details: {}
+                name: "骑乘成就", details: {}
             }
-        },
-        en_US: {}
+        }, en_US: {}
     };
 
-    static EventImplList = [
-        "defaultImpl",
-    ];
+    static EventImplList = ["defaultImpl",];
 
     /**
      * 生物被骑乘
@@ -2837,9 +2687,7 @@ class Ride {
         const type = "ride";
         if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         return {
-            pl,
-            type: this.EVENT,
-            key: mob.type
+            pl, type: this.EVENT, key: mob.type
         };
     }
 
@@ -2856,24 +2704,18 @@ class ProjectileHitEntity {
     static ENTRY = {
         zh_CN: {
             shootDistance: {
-                enable: true,
-                name: "射击成就",
-                details: {
+                enable: true, name: "射击成就", details: {
                     "20": new Achievement("十米开外", "用箭命中距离20以外的生物"),
                     "40": new Achievement("箭无虚发", "用箭命中距离40以外的生物"),
                     "60": new Achievement("神射手", "用箭命中距离60以外的生物"),
                     "80": new Achievement("百步穿杨", "用箭命中距离80以外的生物"),
                     "100": new Achievement("精准制导", "用箭命中距离100以外的生物")
-                },
-                regx: {}
+                }, regx: {}
             }
-        },
-        en_US: {}
+        }, en_US: {}
     };
 
-    static EventImplList = [
-        "shootDistanceImpl",
-    ];
+    static EventImplList = ["shootDistanceImpl",];
 
     /**
      * 生物被弹射物击中
@@ -2911,9 +2753,7 @@ class ProjectileHitEntity {
         for (let key in LangManager.getAchievementEntryType(type).details) {
             if (distance > Number.parseInt(key)) {
                 res.push({
-                    pl,
-                    type,
-                    key
+                    pl, type, key
                 });
             }
         }
@@ -2930,9 +2770,7 @@ class ProjectileCreated {
      */
     static EVENT = "onProjectileCreated";
 
-    static EventImplList = [
-        "shootBindImpl",
-    ];
+    static EventImplList = ["shootBindImpl",];
 
 
     static process(shooter, entity) {
@@ -2973,11 +2811,9 @@ class PlayerCmd {
     static ENTRY = {
         zh_CN: {
             special: {
-                name: "特殊成就",
-                details: {}
+                name: "特殊成就", details: {}
             }
-        },
-        en_US: {}
+        }, en_US: {}
     };
 
     static EventImplList = [];
@@ -3004,11 +2840,9 @@ class PlayerChat {
     static ENTRY = {
         zh_CN: {
             chat: {
-                name: "聊天成就",
-                details: {}
+                name: "聊天成就", details: {}
             }
-        },
-        en_US: {}
+        }, en_US: {}
     };
 
     static EventImplList = [];
@@ -3032,23 +2866,18 @@ class AfterFinished {
     static ENTRY = {
         zh_CN: {
             "achiCount": {
-                enable: true,
-                name: "成就数量成就",
-                details: {
+                enable: true, name: "成就数量成就", details: {
                     "10": new Achievement("小有名气", "达成10个成就"),
                     "50": new Achievement("轻车熟路", "达成50个成就"),
                     "80": new Achievement("游戏人生", "达成80个成就"),
                     "100": new Achievement("忠实粉丝", "达成100个成就"),
                     "150": new Achievement("骨灰玩家", "达成150个成就"),
-                },
-                regx: {}
+                }, regx: {}
             }
         }
     };
 
-    static EventImplList = [
-        "defaultImpl"
-    ];
+    static EventImplList = ["defaultImpl"];
 
     static async process(pl, plData) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
@@ -3068,9 +2897,7 @@ class AfterFinished {
             count = Number.parseInt(count);
             if (plData.finished > count) {
                 return {
-                    pl,
-                    type,
-                    key
+                    pl, type, key
                 };
             }
         }
@@ -3094,29 +2921,7 @@ class EventProcessor {
      * 记录了所有的事件处理class
      * @type {Array}
      */
-    static EVENT_PROCESSOR_LIST =
-        [
-            Join,
-            Left,
-            ChangeDim,
-            Destroy,
-            MobDie,
-            PlDie,
-            ScoreChange,
-            ConsumeTotem,
-            InventoryChange,
-            UseBucketTake,
-            DropItem,
-            Eat,
-            ArmorSet,
-            BedEnter,
-            Ride,
-            ProjectileHitEntity,
-            ProjectileCreated,
-            PlayerChat,
-            PlayerCmd,
-            AfterFinished
-        ];
+    static EVENT_PROCESSOR_LIST = [Join, Left, ChangeDim, Destroy, MobDie, PlDie, ScoreChange, ConsumeTotem, InventoryChange, UseBucketTake, DropItem, Eat, ArmorSet, BedEnter, Ride, ProjectileHitEntity, ProjectileCreated, PlayerChat, PlayerCmd, AfterFinished];
 
     /**
      * pl - 玩家对象
@@ -3130,7 +2935,7 @@ class EventProcessor {
      */
     static asyncParallelProcess(promises) {
         return AsyncUtils.iteratorAsync(promises, async (index, processRes) => {
-            return AchievementManager.process(await processRes).catch(err => {
+            return Utils.isNullOrUndefined(await processRes) ? Promise.reject() : AchievementManager.process(await processRes).catch(err => {
                 throw err;
             });
         }).catch(err => {
@@ -3203,14 +3008,7 @@ class Application {
 
 Application.main();
 
-const Banner =
-    "\n" +
-    "              _     _                                     _          ___    ___   ___  \n" +
-    "    /\\       | |   (_)                                   | |        |__ \\  / _ \\ / _ \\ \n" +
-    "   /  \\   ___| |__  _  _____   _____ _ __ ___   ___ _ __ | |_  __   __ ) || | | | | | |\n" +
-    "  / /\\ \\ / __| '_ \\| |/ _ \\ \\ / / _ \\ '_ ` _ \\ / _ \\ '_ \\| __| \\ \\ / // / | | | | | | |\n" +
-    " / ____ \\ (__| | | | |  __/\\ V /  __/ | | | | |  __/ | | | |_   \\ V // /_ | |_| | |_| |\n" +
-    "/_/    \\_\\___|_| |_|_|\\___| \\_/ \\___|_| |_| |_|\\___|_| |_|\\__|   \\_/|____(_)___(_)___/    By Stranger \n";
+const Banner = "\n" + "              _     _                                     _          ___    ___   ___  \n" + "    /\\       | |   (_)                                   | |        |__ \\  / _ \\ / _ \\ \n" + "   /  \\   ___| |__  _  _____   _____ _ __ ___   ___ _ __ | |_  __   __ ) || | | | | | |\n" + "  / /\\ \\ / __| '_ \\| |/ _ \\ \\ / / _ \\ '_ ` _ \\ / _ \\ '_ \\| __| \\ \\ / // / | | | | | | |\n" + " / ____ \\ (__| | | | |  __/\\ V /  __/ | | | | |  __/ | | | |_   \\ V // /_ | |_| | |_| |\n" + "/_/    \\_\\___|_| |_|_|\\___| \\_/ \\___|_| |_| |_|\\___|_| |_|\\__|   \\_/|____(_)___(_)___/    By Stranger \n";
 
 
 LogUtils.info(Banner);
