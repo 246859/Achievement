@@ -798,6 +798,15 @@ class LangManager {
         return `lang-${type}-${key}`;
     }
 
+
+    /**
+     * 获取词条对象
+     * @returns {*}
+     */
+    static getLangEntry() {
+        return Runtime.entry;
+    }
+
     /**
      * 获取取一个词条的触发值，触发值为undefine即该词条不存在
      * @param type
@@ -805,8 +814,10 @@ class LangManager {
      */
     static getAchievementTriggerName(type, key) {
         let eqRes = this.eqMatch(type, key);
+        LogUtils.debug(eqRes);
         if (eqRes) return eqRes;
         let regRes = this.regxMatch(type, key);
+        LogUtils.debug(regRes);
         if (regRes) return regRes;
         return undefined;
     }
@@ -1834,7 +1845,7 @@ class Join {
      */
     static process(pl) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (Utils.isShaking(pl, Join.EVENT)) return;
+        if (EventProcessor.antiEventShake(pl, Join.EVENT)) return;
         LogUtils.debug(`参数列表:`, ...arguments);
         LogUtils.debug(`事件:${Join.EVENT} 名称:玩家进入服务器 对象:${pl.name}`);
         EventProcessor.eventImplsProcess(Join, [pl], Join.EventImplList).catch((err) => {
@@ -1848,12 +1859,8 @@ class Join {
      * @returns [{Promise<{pl, type: string, key: string}>}]
      */
     static async defaultImpl(pl) {
-        const type = SpecialType.TYPE;
         const key = "join";
-        if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
-        return {
-            pl, type, key
-        };
+        return SpecialType.defaultImpl(pl, key, false, false);
     }
 
 }
@@ -1872,7 +1879,16 @@ class Left {
      */
     static process(pl) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (Utils.isShaking(pl, Left.EVENT)) return;
+        if (EventProcessor.antiEventShake(pl, Left.EVENT)) return;
+        //玩家退出游戏时要把一切tag删了
+        EventProcessor.EVENT_PROCESSOR_LIST.forEach(processor => {
+            if (processor.EVENT) {
+                pl.removeTag(processor.EVENT);
+            }
+        });
+        Object.keys(LangManager.getLangEntry()).forEach(type => {
+            pl.removeTag(type);
+        });
     }
 
 }
@@ -1907,7 +1923,7 @@ class ChangeDim {
      */
     static process(pl, dimid) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (Utils.isShaking(pl, ChangeDim.EVENT)) return;
+        if (EventProcessor.antiEventShake(pl, ChangeDim.EVENT)) return;
         LogUtils.debug(`参数列表:`, ...arguments);
         LogUtils.debug(`事件:${ChangeDim.EVENT} 名称:玩家维度切 玩家:${pl.name} 维度:${dimid}`);
         EventProcessor.eventImplsProcess(ChangeDim, [pl, dimid], ChangeDim.EventImplList).catch(err => {
@@ -1917,10 +1933,7 @@ class ChangeDim {
 
     static defaultImpl(pl, dimid) {
         const type = "changeDim";
-        if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
-        return {
-            pl, type, key: dimid
-        };
+        return StringEqual.defaultImpl(pl, type, dimid);
     }
 }
 
@@ -1975,10 +1988,10 @@ class Destroy {
      */
     static process(pl, bl) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (Utils.isShaking(pl, Destroy.EVENT)) return;
+        if (EventProcessor.antiEventShake(pl, Destroy.EVENT)) return;
         LogUtils.debug(`参数列表:`, ...arguments);
         LogUtils.debug(`事件:${Destroy.EVENT} 名称:玩家破坏方块 玩家:${pl.name} 方块:${bl.type}`);
-        EventProcessor.eventImplsProcess(Destroy, [pl, bl], ChangeDim.EventImplList).catch(err => {
+        EventProcessor.eventImplsProcess(Destroy, [pl, bl], Destroy.EventImplList).catch(err => {
             LogUtils.error(`${Destroy.EVENT}: `, err);
         });
 
@@ -1986,11 +1999,7 @@ class Destroy {
 
     static defaultImpl(pl, bl) {
         const type = "destroyBlock";
-        if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
-        EventProcessor.antiEventShake(pl, type);
-        return {
-            pl, type, key: bl.type
-        };
+        return StringEqual.defaultImpl(pl, type, bl.type);
     }
 }
 
@@ -2015,6 +2024,7 @@ class Place {
 
     static process(pl, bl) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
+        if (EventProcessor.antiEventShake(pl, Place.EVENT)) return;
         LogUtils.debug(`参数列表:`, ...arguments);
         LogUtils.debug(`事件:${Place.EVENT} 名称:玩家放置方块 玩家:${pl.name} 方块:${bl.type}`);
         EventProcessor.eventImplsProcess(Place, [pl, bl], Place.EventImplList).catch(err => {
@@ -2024,7 +2034,8 @@ class Place {
 
 
     static defaultImpl(pl, bl) {
-        return Promise.reject();
+        const type = "place";
+        return StringEqual.defaultImpl(pl, type, bl.type);
     }
 }
 
@@ -2064,8 +2075,8 @@ class PlDie {
                     "minecraft:enderman": new Achievement("敢瞅我？", "死于末影人"),
                     "minecraft:piglin": new Achievement("忘带钱了", "死于猪灵"),
                     "minecraft:endermite": new Achievement("小家伙", "死于末影螨"),
-                    "minecraft:ender_dragon": new Achievement("不是吧，就这？", "死于末影龙"),
-                    "minecraft:wither": new Achievement("不是吧，就这？", "死于凋零"),
+                    "minecraft:ender_dragon": new Achievement("末影龙:不是吧，就这？", "死于末影龙"),
+                    "minecraft:wither": new Achievement("凋零:不是吧，就这？", "死于凋零"),
                     "minecraft:player": new Achievement("死于谋杀", "死于玩家"),
                     "minecraft:dolphin": new Achievement("因果报应", "死于海豚"),
                     "minecraft:panda": new Achievement("功夫熊猫", "死于熊猫"),
@@ -2077,7 +2088,8 @@ class PlDie {
     static EventImplList = ["defaultImpl"];
 
     static process(pl, source) {
-        LogUtils.debug([...arguments]);
+        if (Utils.hasNullOrUndefined(...arguments)) return;
+        if (EventProcessor.antiEventShake(pl, PlDie.EVENT)) return;
         LogUtils.debug(`参数列表:`, ...arguments);
         LogUtils.debug(`事件:${PlDie.EVENT} 名称:玩家死亡 玩家:${pl.name} 来源:${source.type}`);
         EventProcessor.eventImplsProcess(PlDie, [pl, source], PlDie.EventImplList).catch(err => {
@@ -2088,10 +2100,7 @@ class PlDie {
     static async defaultImpl(pl, source) {
         const type = "death";
         const key = source.type;
-        if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
-        return {
-            pl, type, key
-        };
+        return StringEqual.defaultImpl(pl, type, key);
     }
 }
 
@@ -2157,22 +2166,19 @@ class MobDie {
      */
     static process(mob, source, cause) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (Utils.isShaking(source, MobDie.EVENT)) return;
+        if (!(source = Utils.toPlayer(source))) return;
+        if (EventProcessor.antiEventShake(source, MobDie.EVENT)) return;
         LogUtils.debug(`参数列表:`, ...arguments);
-        LogUtils.debug(`事件:${MobDie.EVENT} 名称:生物死亡 死亡对象:${source.type} 来源对象:${mob.type} 死因:${cause}`);
+        LogUtils.debug(`事件:${MobDie.EVENT} 名称:生物死亡 来源对象:${source.type} 死亡对象:${mob.type} 死因:${cause}`);
         EventProcessor.eventImplsProcess(MobDie, [mob, source, cause], MobDie.EventImplList).catch(err => {
             LogUtils.error(`${MobDie.EVENT}: `, err);
         });
     }
 
-    static async defaultImpl(mob, source, cause) {
+    static async defaultImpl(mob, pl, cause) {
         const type = "killer";
-        if (!(source = Utils.toPlayer(source))) return;
-        if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
-        EventProcessor.antiEventShake(source, type);
-        return {
-            pl: source, type, key: mob.type
-        };
+        const key = mob.type;
+        return StringEqual.defaultImpl(pl, type, key);
     }
 }
 
@@ -2200,7 +2206,7 @@ class ScoreChange {
         }, en_US: {}
     };
 
-    static EventImplList = ["scoreMoneyImpl"];
+    static EventImplList = ["defaultImpl", "scoreMoneyImpl"];
 
     /**
      * 计分板变化
@@ -2210,8 +2216,9 @@ class ScoreChange {
      * @param disName
      */
     static process(pl, num, name, disName) {
-        if (!Utils.isPlayerLoaded(pl)) return;
+        if (!Utils.isPlayerLoaded(pl)) return;//进服的时候会初始化玩家计分板，这玩意会多次触发，得做玩家加载判断
         if (Utils.hasNullOrUndefined(...arguments)) return;
+        if (EventProcessor.antiEventShake(pl, ScoreChange.EVENT)) return;
         LogUtils.debug(`参数列表:`, ...arguments);
         LogUtils.debug(`事件:${ScoreChange.EVENT} 名称:玩家计分板数值变化 玩家:${pl.name} 计分板:${name} 数值:${num} 展示名称:${disName}`);
         EventProcessor.eventImplsProcess(ScoreChange, [pl, num, name, disName], ScoreChange.EventImplList).catch(err => {
@@ -2263,8 +2270,7 @@ class ConsumeTotem {
     static ENTRY = {
         zh_CN: {
             special: {
-                name: "特殊成就",
-                details: {
+                name: "特殊成就", details: {
                     "useTotem": new Achievement("大难不死，必有后福", "在濒临死亡时使用图腾")
                 }
             }
@@ -2279,7 +2285,7 @@ class ConsumeTotem {
      */
     static process(pl) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (Utils.isShaking(pl, ConsumeTotem.EVENT)) return;
+        if (EventProcessor.antiEventShake(pl, ConsumeTotem.EVENT)) return;
         LogUtils.debug(`参数列表:`, ...arguments);
         LogUtils.debug(`事件:${ConsumeTotem.EVENT} 名称:玩家消耗图腾 玩家:${pl.name}`);
         EventProcessor.eventImplsProcess(ConsumeTotem, [pl], ConsumeTotem.EventImplList).catch(err => {
@@ -2288,9 +2294,8 @@ class ConsumeTotem {
     }
 
     static defaultImpl(pl) {
-        return {
-            pl, type: SpecialType.TYPE, key: "useTotem"
-        };
+        const key = "useTotem";
+        return SpecialType.defaultImpl(pl, key, false, false);
     }
 }
 
@@ -2354,7 +2359,7 @@ class InventoryChange {
     static process(pl, slot, oldItem, newItem) {
         if (!Utils.isPlayerLoaded(pl)) return;
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (Utils.isShaking(pl, InventoryChange.EVENT)) return;
+        if (EventProcessor.antiEventShake(pl, InventoryChange.EVENT)) return;
         LogUtils.debug(`参数列表:`, ...arguments);
         LogUtils.debug(`事件:${InventoryChange.EVENT} 名称:玩家物品栏变化 玩家:${pl.name} 格子:${slot} 旧物品:${oldItem.type} 新物品:${newItem.type}`);
         EventProcessor.eventImplsProcess(InventoryChange, [pl, slot, oldItem, newItem], InventoryChange.EventImplList).catch(err => {
@@ -2365,12 +2370,9 @@ class InventoryChange {
 
     static async defaultImpl(pl, slot, oldItem, newItem) {
         const type = "itemObtain";
-        if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
-        EventProcessor.antiEventShake(pl, type);
+        const key = newItem.type;
         if (newItem.type === "") return Promise.reject();
-        return {
-            pl, type, key: newItem.type
-        };
+        return StringEqual.defaultImpl(pl, type, key);
     }
 }
 
@@ -2401,7 +2403,7 @@ class UseBucketTake {
      */
     static process(pl, item, target) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (Utils.isShaking(pl, UseBucketTake.EVENT)) return;
+        if (EventProcessor.antiEventShake(pl, UseBucketTake.EVENT)) return;
         LogUtils.debug(`参数列表:`, ...arguments);
         LogUtils.debug(`事件:${UseBucketTake.EVENT} 名称:玩家使用桶装东西 玩家:${pl.name} 物品:${item.type} 目标:${target.type}`);
         EventProcessor.eventImplsProcess(UseBucketTake, [pl, item, target], UseBucketTake.EventImplList).catch(err => {
@@ -2411,11 +2413,8 @@ class UseBucketTake {
 
 
     static defaultImpl(pl, item, target) {
-        const type = SpecialType.TYPE;
-        if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
-        return {
-            pl, type: this.EVENT, key: target.type
-        };
+        const key = target.type;
+        return SpecialType.defaultImpl(pl, key, false, false);
     }
 }
 
@@ -2444,7 +2443,7 @@ class DropItem {
      */
     static process(pl, item) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (Utils.isShaking(pl, DropItem.EVENT)) return;
+        if (EventProcessor.antiEventShake(pl, DropItem.EVENT)) return;
         LogUtils.debug(`参数列表:`, ...arguments);
         LogUtils.debug(`事件:${DropItem.EVENT} 名称:玩家丢出物品 玩家:${pl.name} 物品:${item.type}`);
         EventProcessor.eventImplsProcess(DropItem, [pl, item], DropItem.EventImplList).catch(err => {
@@ -2453,9 +2452,8 @@ class DropItem {
     }
 
     static defaultImpl(pl, item) {
-        return {
-            pl, type: this.EVENT, key: item.type
-        };
+        const key = item.type;
+        return SpecialType.defaultImpl(pl, key, false, false);
     }
 }
 
@@ -2475,7 +2473,7 @@ class Eat {
         }, en_US: {}
     };
 
-    static EventImplList = ["defaultImpl",];
+    static EventImplList = ["defaultImpl"];
 
     /**
      * 食用食物
@@ -2484,7 +2482,7 @@ class Eat {
      */
     static process(pl, item) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (Utils.isShaking(pl, Eat.EVENT)) return;
+        if (EventProcessor.antiEventShake(pl, Eat.EVENT)) return;
         LogUtils.debug(`参数列表:`, ...arguments);
         LogUtils.debug(`事件:${Eat.EVENT} 名称:玩家吃东西 玩家:${pl.name} 物品:${item.type}`);
         EventProcessor.eventImplsProcess(Eat, [pl, item], Eat.EventImplList).catch(err => {
@@ -2492,10 +2490,9 @@ class Eat {
         });
     }
 
-    static default(pl, item) {
-        return {
-            pl, type: this.EVENT, key: item.type
-        };
+    static defaultImpl(pl, item) {
+        const type = "eat";
+        return StringEqual.defaultImpl(pl, type, item.type);
     }
 }
 
@@ -2527,7 +2524,7 @@ class ArmorSet {
     static process(pl, slot, item) {
         if (!Utils.isPlayerLoaded(pl)) return;
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (Utils.isShaking(pl, ArmorSet.EVENT)) return;
+        if (EventProcessor.antiEventShake(pl, ArmorSet.EVENT)) return;
         LogUtils.debug(`参数列表:`, ...arguments);
         LogUtils.debug(`事件:${ArmorSet.EVENT} 名称:玩家设置盔甲栏 玩家:${pl.name} 格子:${slot} 物品:${item.type}`);
         EventProcessor.eventImplsProcess(ArmorSet, [pl, slot, item], ArmorSet.EventImplList).catch(err => {
@@ -2572,9 +2569,9 @@ class BedEnter {
      */
     static process(pl, pos) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (Utils.isShaking(pl, BedEnter.EVENT)) return;
+        if (EventProcessor.antiEventShake(pl, BedEnter.EVENT)) return;
         LogUtils.debug(`参数列表:`, ...arguments);
-        LogUtils.debug(`事件:${BedEnter.EVENT} 名称:玩家上床 玩家:${pl.name} 位置:${Utils.getPosition(pos)} 是否在睡觉:${pl.isSleeping}`);
+        LogUtils.debug(`事件:${BedEnter.EVENT} 名称:玩家上床 玩家:${pl.name} 位置:${Utils.getPosition(pos)}`);
         EventProcessor.eventImplsProcess(BedEnter, [pl, pos], BedEnter.EventImplList).catch(err => {
             LogUtils.error(`${BedEnter.EVENT}: `, err);
         });
@@ -2586,12 +2583,9 @@ class BedEnter {
      * @returns {Promise<[{pl: ({isSleeping}|*), type: string, key: string}]>}
      */
     static async defaultImpl(pl, pos) {
-        if (Utils.isShaking(pl, BedEnter.EVENT)) return Promise.reject();
-        EventProcessor.antiEventShake(pl, BedEnter.EVENT);//为了防止死循环重复，必须提前防抖
         let type = "sleep";
         let key = undefined;
-        if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
-
+        if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();//虽然后面会有开启检测，但是中间操作有点多，这里要提前检测
         if (pos.y > 200) {
             key = "cloudDream";
         } else if (pos.y < 0) {
@@ -2605,9 +2599,8 @@ class BedEnter {
         //睡眠判断
         return BedEnter.asyncSleepValidate(pl).then(res => {
             if (res) {
-                return {
-                    pl, type, key
-                };
+                LogUtils.debug("睡眠判定成功");
+                return StringEqual.defaultImpl(pl, type, key);
             }
         });
     }
@@ -2623,7 +2616,7 @@ class BedEnter {
 
         let currentTime = 0;
         await AsyncUtils.sleep(500);
-        LogUtils.debug("开始睡觉检测");
+        LogUtils.debug("----开始睡眠检测----");
 
         let sleepActor = 0;//睡眠计数因子，要真的睡觉的话，这玩意必须大于等于1
 
@@ -2635,9 +2628,9 @@ class BedEnter {
             currentTime = Utils.getCurrentTime("daytime");
             LogUtils.debug(`${pl.name}是否在睡觉: ${pl.isSleeping} 当前时间为: ${currentTime}`);
         }
-        await AsyncUtils.sleep(700);
+        await AsyncUtils.sleep(500);
         currentTime = Utils.getCurrentTime("daytime");
-        LogUtils.debug("睡觉检测结束");
+        LogUtils.debug("----睡眠检测结束----");
         LogUtils.debug(`当前时间为: ${currentTime}`);
 
         //如果时间大于250则判断为不是清晨
@@ -2672,7 +2665,7 @@ class Ride {
     static process(en1, en2) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
         if (!(en1 = Utils.toPlayer(en1))) return;
-        if (Utils.isShaking(en1, Ride.EVENT)) return;
+        if (EventProcessor.antiEventShake(en1, Ride.EVENT)) return;
         LogUtils.debug(`参数列表:`, ...arguments);
         LogUtils.debug(`事件:${Ride.EVENT} 名称:玩家骑乘实体 玩家:${en1.name} 实体:${en2.type}`);
         EventProcessor.eventImplsProcess(Ride, [en1, en2], Ride.EventImplList).catch(err => {
@@ -2681,12 +2674,9 @@ class Ride {
 
     }
 
-    static async default(pl, mob) {
+    static async defaultImpl(pl, mob) {
         const type = "ride";
-        if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
-        return {
-            pl, type: this.EVENT, key: mob.type
-        };
+        return StringEqual.defaultImpl(pl, type, mob.type);
     }
 
 }
@@ -2722,7 +2712,7 @@ class ProjectileHitEntity {
      */
     static process(en, source) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (Utils.isShaking(en, ProjectileHitEntity.EVENT)) return;
+        if (EventProcessor.antiEventShake(en, ProjectileHitEntity.EVENT)) return;//与其他事件不同的是，这里是给实体加检测而不是玩家
         LogUtils.debug(`参数列表:`, ...arguments);
         LogUtils.debug(`事件:${ProjectileHitEntity.EVENT} 名称:实体被弹射物击中 实体:${en.type} 弹射物:${source.type}`);
         EventProcessor.eventImplsProcess(ProjectileHitEntity, [en, source], ProjectileHitEntity.EventImplList).catch(err => {
@@ -2737,7 +2727,6 @@ class ProjectileHitEntity {
      */
     static async shootDistanceImpl(en, source) {
         const type = "shootDistance";
-        if (!LangManager.getAchievementEntryType(type).enable) return Promise.reject();
         //获取绑定的玩家
         let xuid = RuntimeCache.getCache(source.uniqueId);
         if (!xuid) return;
@@ -2766,7 +2755,7 @@ class ProjectileCreated {
     static process(shooter, entity) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
         if (!(shooter = Utils.toPlayer(shooter))) return;
-        if (Utils.isShaking(shooter, ProjectileHitEntity.EVENT)) return;
+        if (EventProcessor.antiEventShake(shooter, ProjectileHitEntity.EVENT)) return;
         LogUtils.debug(`参数列表:`, ...arguments);
         LogUtils.debug(`事件:${ProjectileCreated.EVENT} 名称:玩家发射弹射物 玩家:${shooter.name} 弹射物:${entity.type} UID:${entity.uniqueId}`);
         EventProcessor.eventImplsProcess(ProjectileCreated, [shooter, entity], ProjectileCreated.EventImplList).catch(err => {
@@ -2810,7 +2799,7 @@ class PlayerCmd {
 
     static process(pl, cmd) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (Utils.isShaking(pl, PlayerCmd.EVENT)) return;
+        if (EventProcessor.antiEventShake(pl, PlayerCmd.EVENT)) return;
         LogUtils.debug(`参数列表:`, ...arguments);
         LogUtils.debug(`事件:${PlayerCmd.EVENT} 名称:玩家使用命令 玩家:${pl.name} 命令:${cmd}`);
         EventProcessor.eventImplsProcess(PlayerCmd, [pl, cmd], PlayerCmd.EventImplList).catch(err => {
@@ -2839,7 +2828,7 @@ class PlayerChat {
 
     static process(pl, msg) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (Utils.isShaking(pl, PlayerChat.EVENT)) return;
+        if (EventProcessor.antiEventShake(pl, PlayerChat.EVENT)) return;
         LogUtils.debug(`参数列表:`, ...arguments);
         LogUtils.debug(`事件:${PlayerChat.EVENT} 名称:玩家发送聊天消息 玩家:${pl.name} 信息:${msg}`);
         EventProcessor.eventImplsProcess(PlayerCmd, [pl, msg], PlayerChat.EventImplList).catch(err => {
@@ -2857,11 +2846,11 @@ class AfterFinished {
         zh_CN: {
             "achiCount": {
                 enable: true, name: "成就数量成就", details: {
-                    "10": new Achievement("小有名气", "达成10个成就"),
-                    "50": new Achievement("轻车熟路", "达成50个成就"),
-                    "80": new Achievement("游戏人生", "达成80个成就"),
-                    "100": new Achievement("忠实粉丝", "达成100个成就"),
-                    "150": new Achievement("骨灰玩家", "达成150个成就"),
+                    "${}>=10": new Achievement("小有名气", "达成10个成就"),
+                    "${}>=50": new Achievement("轻车熟路", "达成50个成就"),
+                    "${}>=80": new Achievement("游戏人生", "达成80个成就"),
+                    "${}>=100": new Achievement("忠实粉丝", "达成100个成就"),
+                    "${}>=150": new Achievement("骨灰玩家", "达成150个成就"),
                 }, regx: {}
             }
         }
@@ -2870,8 +2859,9 @@ class AfterFinished {
     static EventImplList = ["defaultImpl"];
 
     static async process(pl, plData) {
-        if (Utils.hasNullOrUndefined(...arguments)) return;
         const EVENT = "AfterFinished";
+        if (Utils.hasNullOrUndefined(...arguments)) return;
+        if (EventProcessor.antiEventShake(pl, EVENT)) return;
         LogUtils.debug(`事件:${EVENT} 名称:完成成就 玩家:${pl.name} 成就数据:${plData} 成就完成数量:${plData.finished}`);
         EventProcessor.eventImplsProcess(AfterFinished, [pl, plData], AfterFinished.EventImplList).catch(err => {
             LogUtils.error(`${EVENT}: `, err);
@@ -2881,17 +2871,8 @@ class AfterFinished {
 
     static async defaultImpl(pl, plData) {
         const type = "achiCount";
-        let res = [];
-        for (let count in LangManager.getAchievementEntryType(type).details) {
-            let key = count;
-            count = Number.parseInt(count);
-            if (plData.finished > count) {
-                return {
-                    pl, type, key
-                };
-            }
-        }
-        return res;
+        const num = plData.finished;
+        return NumberChange.defaultImpl(pl, type, num, false);
     }
 }
 
@@ -2941,6 +2922,7 @@ class NumberChange {
      */
     static async singleImpl(pl, type, num, entryType) {
         for (let boolExp in entryType.details) {
+            if (RuntimeCache.has(PlDataManager.getCacheKey(pl, type, boolExp))) continue;
             if (NumberChange.calculateExp(type, boolExp, num)) {
                 return {
                     pl, type, key: boolExp
@@ -2962,8 +2944,9 @@ class NumberChange {
         let key = undefined;
         for (let boolExp in entryType.details) {
             key = boolExp;
+            if (RuntimeCache.has(PlDataManager.getCacheKey(pl, type, boolExp))) continue;
             if (NumberChange.calculateExp(type, boolExp, num)) {
-                res.push({pl, type, key: boolExp});
+                res.push({pl, type, key});
             }
         }
         return res;
@@ -3025,6 +3008,14 @@ class StringEqual {
      * @returns {{pl, type, key}}
      */
     static async defaultImpl(pl, type, key) {
+        //类型防抖
+        if (EventProcessor.antiEventShake(pl, type)) return Promise.reject();
+        //如果击中缓存则说明该成就已经完成，不需要再去判断
+        if (RuntimeCache.has(PlDataManager.getCacheKey(pl, type, key))) return Promise.reject();
+        //获取词条类型
+        let entryType = LangManager.getAchievementEntryType(type);
+        //判断对应类型的成就是否存在或者是否启用
+        if (!entryType || !entryType.enable) return Promise.reject();
         return {
             pl, type, key
         };
@@ -3114,13 +3105,13 @@ class EventProcessor {
     static asyncParallelProcess(promises) {
         return AsyncUtils.iteratorAsync(promises, async (index, processRes) => {
             let awaitRes = await processRes;
-            if (Array.isArray(awaitRes)) {
+            if (Array.isArray(awaitRes) && awaitRes.length > 0) {
                 return AsyncUtils.iteratorAsync(awaitRes, (index, res) => {
                     return AchievementManager.processAsync(res);
                 }).catch(err => {
                     throw err;
                 });
-            } else {
+            } else if (!Array.isArray(awaitRes)) {
                 return AchievementManager.processAsync(awaitRes);
             }
         }).catch(err => {
@@ -3166,7 +3157,9 @@ class EventProcessor {
      * @param tag
      */
     static antiEventShake(pl, tag) {
+        if (Utils.isShaking(pl, tag)) return true;
         Utils.antiShake(pl, tag, Runtime.config.antiShake);
+        return false;
     }
 }
 
