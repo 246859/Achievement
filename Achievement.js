@@ -2536,7 +2536,7 @@ class InventoryChange {
         }, en_US: {}
     };
 
-    static EventImplList = ["defaultImpl",];
+    static EventImplList = ["defaultImpl", "eatImpl"];
 
     /**
      * 物品栏变化
@@ -2557,6 +2557,14 @@ class InventoryChange {
     }
 
 
+    /**
+     * 获得物品的默认实现
+     * @param pl
+     * @param slot
+     * @param oldItem
+     * @param newItem
+     * @returns {Promise<{pl, type, key}>}
+     */
     static async defaultImpl(pl, slot, oldItem, newItem) {
         const type = "itemObtain";
         const key = newItem.type;
@@ -2564,6 +2572,28 @@ class InventoryChange {
         if (!newItem.isNull() && oldItem.isNull()) return StringEqual.defaultImpl(pl, type, key, key);
         else return Promise.reject();
     }
+
+    /**
+     * 吃掉食物的实现
+     * @param pl
+     * @param slot
+     * @param oldItem
+     * @param newItem
+     * @returns {Promise<{pl, type, key}>}
+     */
+    static async eatImpl(pl, slot, oldItem, newItem) {
+        const type = "eat";
+        const key = oldItem.type;
+        LogUtils.debug(key);
+        let foodCacheKey = Eat.getFoodCacheKey(pl.xuid);
+        LogUtils.debug(foodCacheKey);
+        let foodType = RuntimeCache.getCache(foodCacheKey);
+        LogUtils.debug(foodType);
+        if (foodType !== key) return Promise.reject();
+        LogUtils.debug("eat_end");
+        return StringEqual.defaultImpl(pl, type, key, key);
+    }
+
 }
 
 
@@ -2662,6 +2692,7 @@ class Eat {
     static ENTRY = {
         zh_CN: {
             eat: {
+                enable: true,
                 name: "食物成就", details: {
                     "minecraft:pufferfish": new Achievement("酸爽!", "吃一个河豚"),
                     "minecraft:cookie": new Achievement("是否接受该网站所有cookie设置", "吃一个饼干"),
@@ -2689,9 +2720,25 @@ class Eat {
         });
     }
 
-    static defaultImpl(pl, item) {
-        const type = "eat";
-        return StringEqual.defaultImpl(pl, type, item.type, type);
+    /**
+     * 这里只能监听到玩家尝试吃东西，而不能监听到玩家吃完东西
+     * @param pl
+     * @param item
+     * @returns {{pl, type, key}}
+     */
+    static async defaultImpl(pl, item) {
+        let handItem = pl.getHand();//获取正在吃的食物
+        LogUtils.debug(handItem.type);
+        let foodCacheKey = Eat.getFoodCacheKey(pl.xuid);
+        RuntimeCache.setCache(foodCacheKey, item.type);
+        setTimeout(() => {
+            RuntimeCache.removeCache(foodCacheKey);
+        }, 4000);
+        return Promise.reject();
+    }
+
+    static getFoodCacheKey(xuid) {
+        return `food-${xuid}`;
     }
 }
 
@@ -3272,14 +3319,19 @@ class StringEqual {
      * @returns {{pl, type, key}}
      */
     static async defaultImpl(pl, type, key, tag) {
+        LogUtils.debug("1");
         //类型防抖
         if (EventProcessor.antiEventShake(pl, tag)) return Promise.reject();
+        LogUtils.debug("2");
         //如果击中缓存则说明该成就已经完成，不需要再去判断
         if (RuntimeCache.has(PlDataManager.getCacheKey(pl, type, key))) return Promise.reject();
+        LogUtils.debug("3");
         //获取词条类型
         let entryType = LangManager.getAchievementEntryType(type);
+        LogUtils.debug("4");
         //判断对应类型的成就是否存在或者是否启用
         if (!entryType || !entryType.enable) return Promise.reject();
+        LogUtils.debug("5");
         return {
             pl, type, key
         };
