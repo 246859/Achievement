@@ -2584,13 +2584,9 @@ class InventoryChange {
     static async eatImpl(pl, slot, oldItem, newItem) {
         const type = "eat";
         const key = oldItem.type;
-        LogUtils.debug(key);
         let foodCacheKey = Eat.getFoodCacheKey(pl.xuid);
-        LogUtils.debug(foodCacheKey);
         let foodType = RuntimeCache.getCache(foodCacheKey);
-        LogUtils.debug(foodType);
         if (foodType !== key) return Promise.reject();
-        LogUtils.debug("eat_end");
         return StringEqual.defaultImpl(pl, type, key, key);
     }
 
@@ -2731,6 +2727,7 @@ class Eat {
         LogUtils.debug(handItem.type);
         let foodCacheKey = Eat.getFoodCacheKey(pl.xuid);
         RuntimeCache.setCache(foodCacheKey, item.type);
+        //4秒后删除缓存，代表最长判定时间为4秒。
         setTimeout(() => {
             RuntimeCache.removeCache(foodCacheKey);
         }, 4000);
