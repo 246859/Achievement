@@ -1937,6 +1937,212 @@ class AchievementManager {
  * 2.每一个事件处理类的成就词条key值可以与其他事件重复，即代表这两个事件是同一种类型的成就
  * 3.如果一个事件处理类中没有ENTRY属性，则在词条收集工作进行时将不会包含该事件，这类事件通常是用作辅助数据处理，并不需要对应的成就词条。
  */
+
+class NumberChange {
+
+    static EVENT = "numberChange";
+
+    static EventImplList = ["numberChangeImpl"];
+
+
+    static numberChangeImpl(pl, type, num, multipart = false) {
+        if (Utils.hasNullOrUndefined(...arguments)) return;
+        EventProcessor.eventImplsProcess(NumberChange, [pl, type, num, multipart], NumberChange.EventImplList).catch(err => {
+            LogUtils.error(`${NumberChange.EVENT}: `, err);
+        });
+    }
+
+    /**
+     * 默认实现
+     * @param pl
+     * @param type
+     * @param num
+     * @param multipart
+     * @returns {Promise<never>|Promise<*[]>|Promise<{pl, type, key: string}>}
+     */
+    static defaultImpl(pl, type, num, multipart) {
+        //防抖
+        if (Utils.isShaking(pl, type)) return Promise.reject();
+        //计分板防抖
+        EventProcessor.antiEventShake(pl, type);
+        //获取词条类型
+        let entryType = LangManager.getAchievementEntryType(type);
+        //判断对应数字类型的成就是否存在或者是否启用
+        if (!entryType || !entryType.enable) return Promise.reject();
+        //最后进行数字逻辑处理
+        return multipart ? NumberChange.multipartImpl(pl, type, num, entryType) : NumberChange.singleImpl(pl, type, num, entryType);
+    }
+
+
+    /**
+     * 一次逻辑只会触发一个值
+     * @param pl
+     * @param type
+     * @param num
+     * @param entryType
+     * @returns {Promise<{pl, type, key: string}>}
+     */
+    static async singleImpl(pl, type, num, entryType) {
+        for (let boolExp in entryType.details) {
+            if (RuntimeCache.has(PlDataManager.getCacheKey(pl, type, boolExp))) continue;
+            if (NumberChange.calculateExp(type, boolExp, num)) {
+                return {
+                    pl, type, key: boolExp
+                };
+            }
+        }
+    }
+
+    /**
+     * 一次逻辑会触发多个值
+     * @param pl
+     * @param type
+     * @param num
+     * @param entryType
+     * @returns {Promise<*[]>}
+     */
+    static async multipartImpl(pl, type, num, entryType) {
+        let res = [];
+        let key = undefined;
+        for (let boolExp in entryType.details) {
+            key = boolExp;
+            if (RuntimeCache.has(PlDataManager.getCacheKey(pl, type, boolExp))) continue;
+            if (NumberChange.calculateExp(type, boolExp, num)) {
+                res.push({pl, type, key});
+            }
+        }
+        return res;
+    }
+
+    /**
+     * 获取数字缓存key
+     * @param type
+     * @param exp
+     * @param num
+     * @returns {string}
+     */
+    static getNumCacheKey(type, exp, num) {
+        return `num-${type}-${exp}-${num}`;
+    }
+
+    /**
+     * 计算表达式
+     * @param type
+     * @param boolExp
+     * @param num
+     * @returns {boolean}
+     */
+    static calculateExp(type, boolExp, num) {
+        let expRes;
+        //获取缓存key
+        let expCacheKey = NumberChange.getNumCacheKey(type, boolExp, num);
+        //如果击中缓存，直接从缓存中读取
+        if (RuntimeCache.has(expCacheKey)) {
+            expRes = RuntimeCache.getCache(expCacheKey);
+        } else {//未击中缓存则计算表达式
+            expRes = Utils.parseStrBoolExp(boolExp, num);
+        }
+        return expRes;
+    }
+
+}
+
+class StringEqual {
+
+    static EVENT = "stringEqual";
+
+    static EventImplList = ["defaultImpl"];
+
+    static stringEqualImpl(pl, type, key) {
+        if (Utils.hasNullOrUndefined(...arguments)) return;
+        if (Utils.isShaking(pl, type)) return;
+        EventProcessor.antiEventShake(pl, type);
+        EventProcessor.eventImplsProcess(StringEqual, [pl, type, key], StringEqual.EventImplList).catch(err => {
+            LogUtils.error(`${StringEqual.EVENT}: `, err);
+        });
+    }
+
+    /**
+     * 十分简单的逻辑，不能再简单了
+     * @param pl 玩家对象
+     * @param type 成就类型
+     * @param key 成就触发值
+     * @param tag 防抖tag 根据实际情况而定，有时候是key有时候是type
+     * @returns {{pl, type, key}}
+     */
+    static async defaultImpl(pl, type, key, tag) {
+        LogUtils.debug("1");
+        //类型防抖
+        if (EventProcessor.antiEventShake(pl, tag)) return Promise.reject();
+        LogUtils.debug("2");
+        //如果击中缓存则说明该成就已经完成，不需要再去判断
+        if (RuntimeCache.has(PlDataManager.getCacheKey(pl, type, key))) return Promise.reject();
+        LogUtils.debug("3");
+        //获取词条类型
+        let entryType = LangManager.getAchievementEntryType(type);
+        LogUtils.debug("4");
+        //判断对应类型的成就是否存在或者是否启用
+        if (!entryType || !entryType.enable) return Promise.reject();
+        LogUtils.debug("5");
+        return {
+            pl, type, key
+        };
+    }
+}
+
+class SpecialType {
+
+    static EVENT = "specialEvent";
+
+    static TYPE = "special";
+
+    static specialImpl(pl, key, isNum = false, multipart = false) {
+        if (Utils.hasNullOrUndefined(...arguments)) return;
+        if (Utils.isShaking(pl, SpecialType.TYPE)) return;
+        EventProcessor.antiEventShake(pl, SpecialType.TYPE);
+        EventProcessor.eventImplsProcess(StringEqual, [pl, key, isNum, multipart], StringEqual.EventImplList).catch(err => {
+            LogUtils.error(`${SpecialType.EVENT}: `, err);
+        });
+    }
+
+    /**
+     * 默认实现
+     * @param pl
+     * @param key
+     * @param isNum
+     * @param multipart
+     * @returns {Promise<*[]|{pl, type, key: string}>|{pl, type, key}}
+     */
+    static defaultImpl(pl, key, isNum, multipart) {
+        return isNum ? SpecialType.defaultNumberImpl(pl, SpecialType.TYPE, key, multipart) : SpecialType.defaultStringImpl(pl, SpecialType.TYPE, key);
+    }
+
+    /**
+     * 字符串成就实现
+     * @param pl
+     * @param type
+     * @param key
+     * @returns {{pl, type, key}}
+     */
+    static async defaultStringImpl(pl, type, key) {
+        return StringEqual.defaultImpl(pl, type, key, key);
+    }
+
+
+    /**
+     * 数字成就实现
+     * @param pl
+     * @param type
+     * @param num
+     * @param multipart
+     * @returns {Promise<*[]|{pl, type, key: string}>}
+     */
+    static async defaultNumberImpl(pl, type, num, multipart) {
+        return NumberChange.defaultImpl(pl, type, num, multipart);
+    }
+
+}
+
 class Join {
 
     /**
@@ -1951,7 +2157,7 @@ class Join {
      */
     static ENTRY = {
         zh_CN: {
-            special: {
+            [SpecialType.TYPE]: {
                 enable: true, name: "特殊成就", details: {
                     join: new Achievement("Hello World!", "首次进入服务器"),
                 }, regx: {}
@@ -2244,7 +2450,7 @@ class AttackEntity {
 
     static ENTRY = {
         zh_CN: {
-            special: {
+            [SpecialType.TYPE]: {
                 enable: true, name: "特殊成就", details: {
                     "counterattack": new Achievement("自食其果", "将恶魂的火球反弹击杀恶魂")
                 }, regx: {}
@@ -2319,8 +2525,8 @@ class MobDie {
                     "minecraft:player": new Achievement("你谋杀了一个玩家!", "首次击杀玩家"),
                     "minecraft:dolphin": new Achievement("精神变态", "首次击杀海豚"),
                     "minecraft:panda": new Achievement("非法捕猎", "首次击杀熊猫"),
-                    "minecraft:chicken": new Achievement("数一数二的烧鸡", "首次击杀鸡"),
-                    "minecraft:sheep": new Achievement("谁会杀害温顺又可爱的绵羊呢？", "首次击杀羊"),
+                    "minecraft:chicken": new Achievement("你干嘛啊~哎呦~", "首次击杀只因"),
+                    "minecraft:sheep": new Achievement("谁会杀害温顺又可爱的绵羊呢？", "首次击杀绵阳"),
                     "minecraft:goat": new Achievement("山羊冲撞", "首次击杀山羊"),
                     "minecraft:pig": new Achievement("挺像你的", "首次击杀猪"),
                     "minecraft:cow": new Achievement("勇敢牛牛，不怕困难", "首次击杀牛"),
@@ -2369,6 +2575,51 @@ class MobDie {
 
     }
 
+}
+
+
+class MobHurt {
+
+    static EVENT = "onMobHurt";
+
+    static ENTRY = {
+
+        zh_CN: {
+            [SpecialType.TYPE]: {
+                enable: true, details: {
+                    "littleHurt": new Achievement("有一点点疼", "单次攻击造成15点伤害"),
+                    "yidao999": new Achievement("是兄弟就来砍我，血战攻沙，一刀999", "单次攻击造成999点伤害"),
+                }, regx: {}
+            }
+        }, en_US: {}
+    };
+
+    static EventImplList = ["defaultImpl"];
+
+    static process(mob, source, damage, cause) {
+        if (Utils.hasNullOrUndefined(mob, source, damage)) return;
+        if (EventProcessor.antiEventShake(mob, MobDie.EVENT)) return;
+        LogUtils.debug("参数列表: ", ...arguments);
+        LogUtils.debug(`事件: ${MobHurt.EVENT} 名称:生物受伤 受伤生物: ${mob.type} 来源: ${source.type} 伤害值: ${damage} 原因: ${cause}`);
+        EventProcessor.eventImplsProcess(MobHurt, [mob, source, damage, cause], MobHurt.EventImplList).catch(err => {
+            LogUtils.error(`事件:${MobHurt.EVENT}: `, err);
+        });
+    }
+
+    /**
+     * 默认实现
+     * @param mob
+     * @param source
+     * @param damage
+     * @returns {Promise<never>}
+     */
+    static defaultImpl(mob, source, damage) {
+        let pl;
+        let key;
+        if (Utils.isNullOrUndefined((pl = Utils.toPlayer(source)))) return Promise.reject();
+        if (damage > 999) key = "yidao999"; else if (damage > 15) key = "littleHurt";
+        if (Utils.isNullOrUndefined(key)) return Promise.reject(); else return SpecialType.defaultImpl(pl, key, false, false);
+    }
 }
 
 class ScoreChange {
@@ -2458,7 +2709,7 @@ class ConsumeTotem {
 
     static ENTRY = {
         zh_CN: {
-            special: {
+            [SpecialType.TYPE]: {
                 name: "特殊成就", details: {
                     "useTotem": new Achievement("大难不死，必有后福", "在濒临死亡时使用图腾")
                 }
@@ -2569,8 +2820,7 @@ class InventoryChange {
         const type = "itemObtain";
         const key = newItem.type;
         //放入物品时才会触发成就(存在bug,玩家在背包内将一个物品放到空格里也会触发,目前没有找到解决方法)
-        if (!newItem.isNull() && oldItem.isNull()) return StringEqual.defaultImpl(pl, type, key, key);
-        else return Promise.reject();
+        if (!newItem.isNull() && oldItem.isNull()) return StringEqual.defaultImpl(pl, type, key, key); else return Promise.reject();
     }
 
     /**
@@ -2603,7 +2853,7 @@ class UseBucketTake {
 
     static ENTRY = {
         zh_CN: {
-            special: {
+            [SpecialType.TYPE]: {
                 name: "特殊成就", details: {
                     "lava": new Achievement("喝点暖暖身子", "舀一桶岩浆")
                 }, regx: {
@@ -2648,7 +2898,7 @@ class DropItem {
 
     static ENTRY = {
         zh_CN: {
-            special: {
+            [SpecialType.TYPE]: {
                 name: "特殊成就", details: {}
             }
         }, en_US: {}
@@ -2688,12 +2938,13 @@ class Eat {
     static ENTRY = {
         zh_CN: {
             eat: {
-                enable: true,
-                name: "食物成就", details: {
-                    "minecraft:pufferfish": new Achievement("酸爽!", "吃一个河豚"),
-                    "minecraft:cookie": new Achievement("是否接受该网站所有cookie设置", "吃一个饼干"),
-                    "minecraft:dried_kelp": new Achievement("海的味道，我知道", "吃一个波力海苔"),
+                enable: true, name: "食物成就", details: {
+                    "minecraft:pufferfish": new Achievement("酸爽!", "吃掉一个河豚"),
+                    "minecraft:cookie": new Achievement("是否接受该网站所有cookie设置", "吃掉一个饼干"),
+                    "minecraft:dried_kelp": new Achievement("海的味道，我知道", "吃掉一个波力海苔"),
                     "minecraft:rotten_flesh": new Achievement("勉强充饥", "吃掉一个僵尸腐肉"),
+                    "minecraft:apple": new Achievement("每天一苹果，医生远离我", "吃掉一个苹果"),
+                    "minecraft:cooked_chicken": new Achievement("数一数二的烧鸡!", "吃掉一个烧鸡"),
                 }
             }
         }, en_US: {}
@@ -2937,48 +3188,6 @@ class BedEnter {
 
 }
 
-class Ride {
-
-    /**
-     * 骑乘
-     * @type {string}
-     */
-    static EVENT = "onRide";
-
-    static ENTRY = {
-        zh_CN: {
-            ride: {
-                name: "骑乘成就", details: {}
-            }
-        }, en_US: {}
-    };
-
-    static EventImplList = ["defaultImpl",];
-
-    /**
-     * 生物被骑乘
-     * @param en1
-     * @param en2
-     */
-    static process(en1, en2) {
-        if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (!(en1 = Utils.toPlayer(en1))) return;
-        if (EventProcessor.antiEventShake(en1, Ride.EVENT)) return;
-        LogUtils.debug(`参数列表:`, ...arguments);
-        LogUtils.debug(`事件:${Ride.EVENT} 名称:玩家骑乘实体 玩家:${en1.name} 实体:${en2.type}`);
-        EventProcessor.eventImplsProcess(Ride, [en1, en2], Ride.EventImplList).catch(err => {
-            LogUtils.error(`${Ride.EVENT}: `, err);
-        });
-
-    }
-
-    static async defaultImpl(pl, mob) {
-        const type = "ride";
-        return StringEqual.defaultImpl(pl, type, mob.type, type);
-    }
-
-}
-
 class ProjectileHitEntity {
 
     /**
@@ -3096,7 +3305,7 @@ class PlayerCmd {
 
     static ENTRY = {
         zh_CN: {
-            special: {
+            [SpecialType.TYPE]: {
                 name: "特殊成就", details: {}
             }
         }, en_US: {}
@@ -3183,210 +3392,6 @@ class AfterFinished {
     }
 }
 
-class NumberChange {
-
-    static EVENT = "numberChange";
-
-    static EventImplList = ["numberChangeImpl"];
-
-
-    static numberChangeImpl(pl, type, num, multipart = false) {
-        if (Utils.hasNullOrUndefined(...arguments)) return;
-        EventProcessor.eventImplsProcess(NumberChange, [pl, type, num, multipart], NumberChange.EventImplList).catch(err => {
-            LogUtils.error(`${NumberChange.EVENT}: `, err);
-        });
-    }
-
-    /**
-     * 默认实现
-     * @param pl
-     * @param type
-     * @param num
-     * @param multipart
-     * @returns {Promise<never>|Promise<*[]>|Promise<{pl, type, key: string}>}
-     */
-    static defaultImpl(pl, type, num, multipart) {
-        //防抖
-        if (Utils.isShaking(pl, type)) return Promise.reject();
-        //计分板防抖
-        EventProcessor.antiEventShake(pl, type);
-        //获取词条类型
-        let entryType = LangManager.getAchievementEntryType(type);
-        //判断对应数字类型的成就是否存在或者是否启用
-        if (!entryType || !entryType.enable) return Promise.reject();
-        //最后进行数字逻辑处理
-        return multipart ? NumberChange.multipartImpl(pl, type, num, entryType) : NumberChange.singleImpl(pl, type, num, entryType);
-    }
-
-
-    /**
-     * 一次逻辑只会触发一个值
-     * @param pl
-     * @param type
-     * @param num
-     * @param entryType
-     * @returns {Promise<{pl, type, key: string}>}
-     */
-    static async singleImpl(pl, type, num, entryType) {
-        for (let boolExp in entryType.details) {
-            if (RuntimeCache.has(PlDataManager.getCacheKey(pl, type, boolExp))) continue;
-            if (NumberChange.calculateExp(type, boolExp, num)) {
-                return {
-                    pl, type, key: boolExp
-                };
-            }
-        }
-    }
-
-    /**
-     * 一次逻辑会触发多个值
-     * @param pl
-     * @param type
-     * @param num
-     * @param entryType
-     * @returns {Promise<*[]>}
-     */
-    static async multipartImpl(pl, type, num, entryType) {
-        let res = [];
-        let key = undefined;
-        for (let boolExp in entryType.details) {
-            key = boolExp;
-            if (RuntimeCache.has(PlDataManager.getCacheKey(pl, type, boolExp))) continue;
-            if (NumberChange.calculateExp(type, boolExp, num)) {
-                res.push({pl, type, key});
-            }
-        }
-        return res;
-    }
-
-    /**
-     * 获取数字缓存key
-     * @param type
-     * @param exp
-     * @param num
-     * @returns {string}
-     */
-    static getNumCacheKey(type, exp, num) {
-        return `num-${type}-${exp}-${num}`;
-    }
-
-    /**
-     * 计算表达式
-     * @param type
-     * @param boolExp
-     * @param num
-     * @returns {boolean}
-     */
-    static calculateExp(type, boolExp, num) {
-        let expRes;
-        //获取缓存key
-        let expCacheKey = NumberChange.getNumCacheKey(type, boolExp, num);
-        //如果击中缓存，直接从缓存中读取
-        if (RuntimeCache.has(expCacheKey)) {
-            expRes = RuntimeCache.getCache(expCacheKey);
-        } else {//未击中缓存则计算表达式
-            expRes = Utils.parseStrBoolExp(boolExp, num);
-        }
-        return expRes;
-    }
-
-}
-
-class StringEqual {
-
-    static EVENT = "stringEqual";
-
-    static EventImplList = ["defaultImpl"];
-
-    static stringEqualImpl(pl, type, key) {
-        if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (Utils.isShaking(pl, type)) return;
-        EventProcessor.antiEventShake(pl, type);
-        EventProcessor.eventImplsProcess(StringEqual, [pl, type, key], StringEqual.EventImplList).catch(err => {
-            LogUtils.error(`${StringEqual.EVENT}: `, err);
-        });
-    }
-
-    /**
-     * 十分简单的逻辑，不能再简单了
-     * @param pl 玩家对象
-     * @param type 成就类型
-     * @param key 成就触发值
-     * @param tag 防抖tag 根据实际情况而定，有时候是key有时候是type
-     * @returns {{pl, type, key}}
-     */
-    static async defaultImpl(pl, type, key, tag) {
-        LogUtils.debug("1");
-        //类型防抖
-        if (EventProcessor.antiEventShake(pl, tag)) return Promise.reject();
-        LogUtils.debug("2");
-        //如果击中缓存则说明该成就已经完成，不需要再去判断
-        if (RuntimeCache.has(PlDataManager.getCacheKey(pl, type, key))) return Promise.reject();
-        LogUtils.debug("3");
-        //获取词条类型
-        let entryType = LangManager.getAchievementEntryType(type);
-        LogUtils.debug("4");
-        //判断对应类型的成就是否存在或者是否启用
-        if (!entryType || !entryType.enable) return Promise.reject();
-        LogUtils.debug("5");
-        return {
-            pl, type, key
-        };
-    }
-}
-
-class SpecialType {
-
-    static EVENT = "specialEvent";
-
-    static TYPE = "special";
-
-    static specialImpl(pl, key, isNum = false, multipart = false) {
-        if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (Utils.isShaking(pl, SpecialType.TYPE)) return;
-        EventProcessor.antiEventShake(pl, SpecialType.TYPE);
-        EventProcessor.eventImplsProcess(StringEqual, [pl, key, isNum, multipart], StringEqual.EventImplList).catch(err => {
-            LogUtils.error(`${SpecialType.EVENT}: `, err);
-        });
-    }
-
-    /**
-     * 默认实现
-     * @param pl
-     * @param key
-     * @param isNum
-     * @param multipart
-     * @returns {Promise<*[]|{pl, type, key: string}>|{pl, type, key}}
-     */
-    static defaultImpl(pl, key, isNum, multipart) {
-        return isNum ? SpecialType.defaultNumberImpl(pl, SpecialType.TYPE, key, multipart) : SpecialType.defaultStringImpl(pl, SpecialType.TYPE, key);
-    }
-
-    /**
-     * 字符串成就实现
-     * @param pl
-     * @param type
-     * @param key
-     * @returns {{pl, type, key}}
-     */
-    static async defaultStringImpl(pl, type, key) {
-        return StringEqual.defaultImpl(pl, type, key, key);
-    }
-
-
-    /**
-     * 数字成就实现
-     * @param pl
-     * @param type
-     * @param num
-     * @param multipart
-     * @returns {Promise<*[]|{pl, type, key: string}>}
-     */
-    static async defaultNumberImpl(pl, type, num, multipart) {
-        return NumberChange.defaultImpl(pl, type, num, multipart);
-    }
-
-}
 
 /**
  * 事件监听回调处理器
@@ -3403,7 +3408,7 @@ class EventProcessor {
      * 记录了所有的事件处理class
      * @type {Array}
      */
-    static EVENT_PROCESSOR_LIST = [Join, Left, ChangeDim, Destroy, Place, AttackEntity, MobDie, PlDie, ScoreChange, ConsumeTotem, InventoryChange, UseBucketTake, DropItem, Eat, ArmorSet, BedEnter, Ride, ProjectileHitEntity, ProjectileCreated, PlayerChat, PlayerCmd, AfterFinished];
+    static EVENT_PROCESSOR_LIST = [Join, Left, ChangeDim, Destroy, Place, AttackEntity, MobHurt, MobDie, PlDie, ScoreChange, ConsumeTotem, InventoryChange, UseBucketTake, DropItem, Eat, ArmorSet, BedEnter, ProjectileHitEntity, ProjectileCreated, PlayerChat, PlayerCmd, AfterFinished];
 
     /**
      * pl - 玩家对象
