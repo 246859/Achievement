@@ -333,6 +333,21 @@ class AsyncUtils {
 class Utils {
 
     /**
+     * 检测玩家是否含有某一个物品
+     * @param pl
+     * @param type
+     * @returns {boolean}
+     */
+    static plHasItem(pl, type) {
+        for (let item of pl.getInventory().getAllItems()) {
+            if (item.type === type) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * 判断一个玩家是否已经加载完成
      * BDS服务端会在玩家进入服务器时初始化玩家数据
      * 这会大量的循环的不断的触发一些事件监听，还会进入成就的判断逻辑
@@ -780,6 +795,9 @@ class LangManager {
                         for (let key in processor.ENTRY[langKey][achi_type].details) {
                             entry[langKey][achi_type].details[key] = processor.ENTRY[langKey][achi_type].details[key];
                         }
+                        for (let key in processor.ENTRY[langKey][achi_type].regx) {
+                            entry[langKey][achi_type].regx[key] = processor.ENTRY[langKey][achi_type].regx[key];
+                        }
                     }
                     Runtime.entryTotalCounts += Object.keys(entry[langKey][achi_type].details).length;
                 }
@@ -813,11 +831,13 @@ class LangManager {
      * @param key
      */
     static getAchievementTriggerName(type, key) {
+        LogUtils.debug("开始词条匹配");
         let eqRes = this.eqMatch(type, key);
-        LogUtils.debug(eqRes);
+        LogUtils.debug(`type: ${type} key: ${key} 等值匹配-> type: ${type} trigger: ${eqRes}`);
         if (!Utils.isNullOrUndefined(eqRes)) return eqRes;
         let regRes = this.regxMatch(type, key);
-        LogUtils.debug(regRes);
+        LogUtils.debug("等值匹配未查询到对应词条，开始正则匹配");
+        LogUtils.debug(`type: ${type} key: ${key} 正则匹配-> type: ${type} trigger: ${regRes}`);
         if (!Utils.isNullOrUndefined(regRes)) return regRes;
         return undefined;
     }
@@ -1021,6 +1041,11 @@ class RuntimeCache {
     static has(key) {
         return this.cacheMap.has(key);
     }
+
+    static toString() {
+        return JSON.stringify([...this.cacheMap.entries()]);
+    }
+
 }
 
 /**
@@ -1697,7 +1722,110 @@ class Achievement {
 class AchievementManager {
 
     /**
-     * 判断玩家是否完成某个成就
+     * 参数校验
+     * @param params
+     * @returns {boolean}
+     */
+    static paramsValidate(...params) {
+        LogUtils.debug("参数列表: ", ...arguments);
+        //参数校验
+        if (Utils.hasNullOrUndefined(...arguments)) {
+            LogUtils.debug("请求参数校验不通过");
+            return false;
+        } else {
+            LogUtils.debug("请求参数校验已通过");
+            return true;
+        }
+    }
+
+    /**
+     * 是否有映射的triggerName
+     * @param type
+     * @param key
+     * @returns {*|undefined}
+     */
+    static hasTriggerName(type, key) {
+        let triggerName = LangManager.getAchievementTriggerName(type, key);//有些词条会存在映射，映射得到的最终结果才是词条 即 key -> mapEntry
+        //根据key值获取词条真实的触发值
+        if (Utils.isNullOrUndefined(triggerName)) {
+            LogUtils.debug("未查询到对应的成就词条");
+            return undefined;
+        } else {
+            LogUtils.debug("已查询到对应的成就词条");
+            return triggerName;
+        }
+    }
+
+    /**
+     * 词条是否可用
+     * @param type
+     * @param trigger
+     * @returns {{enable}|*|undefined}
+     */
+    static isEntryAvailable(type, trigger) {
+        //获取真实对应的词条
+        let mapEntry = LangManager.getAchievementEntry(type, trigger);
+        //是否存在
+        if (Utils.isNullOrUndefined(mapEntry)) {
+            LogUtils.debug("成就词条不可用");
+            return undefined;
+        }
+        //判断该词条是否启用
+        if (!mapEntry.enable) {
+            LogUtils.debug("检测到成就词条未启用");
+            return undefined;
+        } else {
+            LogUtils.debug("检测到成就词条已启用");
+            LogUtils.debug(`词条信息: ${mapEntry.msg} 词条条件: ${mapEntry.condition}`);
+            return mapEntry;
+        }
+    }
+
+    /**
+     * 是否完成某一个成就
+     * @param pl
+     * @param type
+     * @param trigger
+     */
+    static isFinishedAchievement(pl, type, trigger) {
+        //是否完成成就
+        if (this.judgeAchievement(pl, type, trigger)) {
+            LogUtils.debug("玩家曾经已完成该成就");
+            return true;
+        } else {
+            LogUtils.debug("玩家曾经未完成该成就");
+            return false;
+        }
+    }
+
+    /**
+     * 更新一个玩家对应的成就状态
+     * @param pl
+     * @param type
+     * @param key
+     * @param status
+     */
+    static updateAchievement(pl, type, key, status) {
+        try {
+            if (status) {
+                PlDataManager.setPlAchiKey(pl.xuid, type, key, new PlayerAchievement(status, new Date().toLocaleString(), pl.pos));
+                PlDataManager.getPlAchiInfo(pl.xuid).finished++;
+            } else {
+                PlDataManager.setPlAchiKey(pl.xuid, type, key, undefined);
+                PlDataManager.getPlAchiInfo(pl.xuid).finished--;
+            }
+        } catch (err) {
+            LogUtils.debug("修改玩家成就装状态失败: ", err);
+            return false;
+        }
+        //修改过玩家成就状态后，重新写入缓存。
+        RuntimeCache.setCache(PlDataManager.getCacheKey(pl, type, key), PlDataManager.getCacheKey(pl.xuid, type, key));
+        LogUtils.debug("修改玩家成就状态成功");
+        return true;
+    }
+
+    /**
+     * 获取一个玩家的成就状态
      */
     static judgeAchievement(pl, type, key) {
         const cacheKey = PlDataManager.getCacheKey(pl, type, key);
@@ -1715,6 +1843,7 @@ class AchievementManager {
      */
     static modifyAchievement(pl, type, key, status) {
         PlDataManager.initPlayerInfo(pl, type);
+        let originalPlayerInfo = PlDataManager.getPlAchiInfo(pl.xuid);
         //status 为true是新增,false是删除
         if (status) {
             PlDataManager.setPlAchiKey(pl.xuid, type, key, new PlayerAchievement(status, new Date().toLocaleString(), pl.pos));
@@ -1734,27 +1863,22 @@ class AchievementManager {
      * @param promises promise数组
      */
     static async process({pl, type, key}) {
-        //参数校验
-        if (Utils.hasNullOrUndefined(pl, type, key)) return Promise.reject();
-        // LogUtils.debug(Utils.loadTemplate(Runtime.SystemInfo.achi.enter, pl.name, type, key)); 这段代码会导致BDS直接假死 非常牛逼
-        LogUtils.debug(Runtime.SystemInfo.achi.args);
-        let triggerName = LangManager.getAchievementTriggerName(type, key);//有些词条会存在映射，映射得到的最终结果才是词条 即 key -> mapEntry
-        //根据key值获取词条真实的触发值
-        if (Utils.isNullOrUndefined(triggerName)) return;
-        LogUtils.debug(Runtime.SystemInfo.achi.exist);
+        LogUtils.debug("-----接收到成就处理请求-----");
+        //进行参数校验
+        if (!this.paramsValidate(...arguments)) return Promise.reject();
+        let trigger;
+        //读取对应映射的触发值
+        if (Utils.isNullOrUndefined(trigger = this.hasTriggerName(type, key))) return Promise.reject();
+        let entry;
         //获取真实对应的词条
-        let mapEntry = LangManager.getAchievementEntry(type, triggerName);
-        //判断该词条是否启用
-        if (!mapEntry.enable) return;
-        LogUtils.debug(`启用状态:${mapEntry.enable} 触发条件:${mapEntry.condition}`);
-        //是否完成成就
-        if (this.judgeAchievement(pl, type, triggerName)) return;
-        LogUtils.debug(Runtime.SystemInfo.achi.status);
-        //修改成就完成状态
-        this.modifyAchievement(pl, type, triggerName, true);
-        LogUtils.debug(Runtime.SystemInfo.achi.update);
+        if (Utils.isNullOrUndefined(entry = this.isEntryAvailable(type, trigger))) return Promise.reject();
+        //判断玩家是否已完成成就
+        if (this.isFinishedAchievement(pl, type, trigger)) return Promise.reject();
+        //修改玩家成就状态
+        if (!this.updateAchievement(pl, type, trigger, true)) return Promise.reject();
+        LogUtils.debug("-----成就处理完成,准备异步后处理-----");
         //成就完成后处理
-        return this.postProcess(pl, mapEntry);
+        return this.postProcess(pl, entry);
     }
 
     /**
@@ -1933,7 +2057,7 @@ class ChangeDim {
 
     static defaultImpl(pl, dimid) {
         const type = "changeDim";
-        return StringEqual.defaultImpl(pl, type, dimid);
+        return StringEqual.defaultImpl(pl, type, dimid, type);
     }
 }
 
@@ -1999,7 +2123,7 @@ class Destroy {
 
     static defaultImpl(pl, bl) {
         const type = "destroyBlock";
-        return StringEqual.defaultImpl(pl, type, bl.type);
+        return StringEqual.defaultImpl(pl, type, bl.type, type);
     }
 }
 
@@ -2015,7 +2139,17 @@ class Place {
     static ENTRY = {
         zh_CN: {
             place: {
-                enable: true, name: "放置成就", details: {}, regx: {}
+                enable: true, name: "放置成就", details: {
+                    "minecraft:flower_pot": new Achievement("准备园艺", "放置一个花盆"),
+                    "minecraft:sapling": new Achievement("环保工作", "种一颗树苗"),
+                    "minecraft:sign": new Achievement("告诉大家伙!", "放置一个告示牌"),
+                    "minecraft:bell": new Achievement("咚咚咚", "放置一个钟"),
+                    "minecraft:tnt": new Achievement("准备干点坏事", "放置TNT"),
+                    "minecraft:beacon": new Achievement("老远就能看见了", "放置一个信标"),
+                    "minecraft:brewing_stand": new Achievement("炼金时间到", "放置一个炼药台"),
+                }, regx: {
+                    "_sign": "minecraft:sign"
+                }
             }
         }, en_US: {}
     };
@@ -2035,7 +2169,7 @@ class Place {
 
     static defaultImpl(pl, bl) {
         const type = "place";
-        return StringEqual.defaultImpl(pl, type, bl.type);
+        return StringEqual.defaultImpl(pl, type, bl.type, type);
     }
 }
 
@@ -2100,7 +2234,47 @@ class PlDie {
     static async defaultImpl(pl, source) {
         const type = "death";
         const key = source.type;
-        return StringEqual.defaultImpl(pl, type, key);
+        return StringEqual.defaultImpl(pl, type, key, type);
+    }
+}
+
+class AttackEntity {
+
+    static EVENT = "onAttackEntity";
+
+    static ENTRY = {
+        zh_CN: {
+            special: {
+                enable: true, name: "特殊成就", details: {
+                    "counterattack": new Achievement("自食其果", "将恶魂的火球反弹击杀恶魂")
+                }, regx: {}
+            }
+        }
+    };
+
+    static EventImplList = ["ghastKillerImpl"];
+
+    static process(pl, en) {
+        if (Utils.hasNullOrUndefined(...arguments)) return;
+        if (EventProcessor.antiEventShake(pl, AttackEntity.EVENT)) return;
+        LogUtils.debug(`参数列表:`, ...arguments);
+        LogUtils.debug(`事件:${AttackEntity.EVENT} 名称:玩家攻击实体 玩家:${pl.name} 实体:${en.type} UID:${en.uniqueId}`);
+        EventProcessor.collectPromiseCall(AttackEntity, [pl, en], AttackEntity.EventImplList);
+    }
+
+    /**
+     * 火球击杀恶魂判定
+     * @param pl
+     * @param en
+     */
+    static async ghastKillerImpl(pl, en) {
+        if (en.type !== "minecraft:fireball") return Promise.reject();
+        RuntimeCache.setCache(en.uniqueId, pl.xuid);//将火焰球与玩家绑定
+        //12秒后自动删除=从玩家反击火焰球到击杀恶魂这段时间的最大判断时间为12秒
+        setTimeout(() => {
+            RuntimeCache.removeCache(en.uniqueId);
+        }, 12 * 1000);
+        return Promise.reject();
     }
 }
 
@@ -2156,7 +2330,7 @@ class MobDie {
         }, en_US: {}
     };
 
-    static EventImplList = ["defaultImpl"];
+    static EventImplList = ["defaultImpl", "ghastDieImpl"];
 
     /**
      * 生物死亡
@@ -2166,7 +2340,6 @@ class MobDie {
      */
     static process(mob, source, cause) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (!(source = Utils.toPlayer(source))) return;
         if (EventProcessor.antiEventShake(source, MobDie.EVENT)) return;
         LogUtils.debug(`参数列表:`, ...arguments);
         LogUtils.debug(`事件:${MobDie.EVENT} 名称:生物死亡 来源对象:${source.type} 死亡对象:${mob.type} 死因:${cause}`);
@@ -2175,11 +2348,27 @@ class MobDie {
         });
     }
 
-    static async defaultImpl(mob, pl, cause) {
+    static async defaultImpl(mob, source, cause) {
+        let pl;
+        if (!(pl = Utils.toPlayer(source))) return Promise.reject();
         const type = "killer";
         const key = mob.type;
-        return StringEqual.defaultImpl(pl, type, key);
+
+        return StringEqual.defaultImpl(pl, type, key, key);
     }
+
+    static ghastDieImpl(mob, source, cause) {
+        //死亡生物是恶魂，且被弹射物击杀，而且拥有与玩家绑定的UID 则判定为符合条件
+        if (mob.type !== "minecraft:ghast" || source.type !== "minecraft:player" || cause !== 3) return Promise.reject();
+        let pl;
+        if (!(pl = Utils.toPlayer(source))) return Promise.reject();
+        let xuid = RuntimeCache.getCache(mob.uniqueId);
+        if (xuid !== pl.xuid) return Promise.reject();
+        const key = "counterattack";
+        return SpecialType.defaultImpl(pl, key, false, false);
+
+    }
+
 }
 
 class ScoreChange {
@@ -2194,13 +2383,13 @@ class ScoreChange {
         zh_CN: {
             "ScoreMoney": {
                 enable: true, name: "经济成就", details: {
-                    "${}<=0": new Achievement("大负翁", "经济小于等于0"),
-                    "${}>=1000": new Achievement("低保生活", "经济大于等于1k"),
-                    "${}>=10000": new Achievement("卑微社畜", "经济大于等于1w"),
-                    "${}>=100000": new Achievement("小康生活", "经济大于等于10w"),
-                    "${}>=1000000": new Achievement("百万富翁", "经济大于等于100w"),
-                    "${}>=10000000": new Achievement("千万富翁", "经济大于等于1000w"),
-                    "${}>=100000000": new Achievement("亿万富翁", "经济大于等于10000w")
+                    "${}<=0": new Achievement("大负翁", "经济达到0"),
+                    "${}>=1000": new Achievement("低保生活", "经济达到1k"),
+                    "${}>=10000": new Achievement("卑微社畜", "经济达到1w"),
+                    "${}>=100000": new Achievement("小康生活", "经济达到10w"),
+                    "${}>=1000000": new Achievement("百万富翁", "经济达到100w"),
+                    "${}>=10000000": new Achievement("千万富翁", "经济达到1000w"),
+                    "${}>=100000000": new Achievement("亿万富翁", "经济达到10000w")
                 }, regx: {}
             },
         }, en_US: {}
@@ -2371,8 +2560,9 @@ class InventoryChange {
     static async defaultImpl(pl, slot, oldItem, newItem) {
         const type = "itemObtain";
         const key = newItem.type;
-        if (newItem.type === "") return Promise.reject();
-        return StringEqual.defaultImpl(pl, type, key);
+        //放入物品时才会触发成就(存在bug,玩家在背包内将一个物品放到空格里也会触发,目前没有找到解决方法)
+        if (!newItem.isNull() && oldItem.isNull()) return StringEqual.defaultImpl(pl, type, key, key);
+        else return Promise.reject();
     }
 }
 
@@ -2388,7 +2578,11 @@ class UseBucketTake {
     static ENTRY = {
         zh_CN: {
             special: {
-                name: "特殊成就", details: {}
+                name: "特殊成就", details: {
+                    "lava": new Achievement("喝点暖暖身子", "舀一桶岩浆")
+                }, regx: {
+                    "lava": "lava"
+                }
             }
         }, en_US: {}
     };
@@ -2468,7 +2662,12 @@ class Eat {
     static ENTRY = {
         zh_CN: {
             eat: {
-                name: "食物成就", details: {}
+                name: "食物成就", details: {
+                    "minecraft:pufferfish": new Achievement("酸爽!", "吃一个河豚"),
+                    "minecraft:cookie": new Achievement("是否接受该网站所有cookie设置", "吃一个饼干"),
+                    "minecraft:dried_kelp": new Achievement("海的味道，我知道", "吃一个波力海苔"),
+                    "minecraft:rotten_flesh": new Achievement("勉强充饥", "吃掉一个僵尸腐肉"),
+                }
             }
         }, en_US: {}
     };
@@ -2492,7 +2691,7 @@ class Eat {
 
     static defaultImpl(pl, item) {
         const type = "eat";
-        return StringEqual.defaultImpl(pl, type, item.type);
+        return StringEqual.defaultImpl(pl, type, item.type, type);
     }
 }
 
@@ -2507,12 +2706,16 @@ class ArmorSet {
     static ENTRY = {
         zh_CN: {
             armor: {
-                name: "装备成就", details: {}
+                enable: true, name: "装备成就", details: {
+                    "setAll": new Achievement("全副武装", "装备一套任意盔甲"),
+                    "preFly": new Achievement("芜湖起飞!", "装备鞘翅"),
+                    "netheriteAll": new Achievement("武装到牙齿", "装备一套合金盔甲")
+                }
             }
         }, en_US: {}
     };
 
-    static EventImplList = ["defaultImpl",];
+    static EventImplList = ["defaultImpl", "elytraImpl", "netheriteImpl"];
 
 
     /**
@@ -2525,6 +2728,7 @@ class ArmorSet {
         if (!Utils.isPlayerLoaded(pl)) return;
         if (Utils.hasNullOrUndefined(...arguments)) return;
         if (EventProcessor.antiEventShake(pl, ArmorSet.EVENT)) return;
+        if (item.isNull()) return;
         LogUtils.debug(`参数列表:`, ...arguments);
         LogUtils.debug(`事件:${ArmorSet.EVENT} 名称:玩家设置盔甲栏 玩家:${pl.name} 格子:${slot} 物品:${item.type}`);
         EventProcessor.eventImplsProcess(ArmorSet, [pl, slot, item], ArmorSet.EventImplList).catch(err => {
@@ -2532,9 +2736,56 @@ class ArmorSet {
         });
     }
 
+    /**
+     * 装备一套盔甲和和盾牌
+     * @param pl
+     * @param slot
+     * @param item
+     * @returns {Promise<{pl, type, key}>}
+     */
     static async defaultImpl(pl, slot, item) {
-        //TODO 装备盔甲成就实现
-        return Promise.reject();
+        const type = "armor";
+        const key = "setAll";
+        let armors = pl.getArmor().getAllItems();
+        for (let armor of armors) {
+            if (armor.isNull()) {
+                return Promise.reject();
+            }
+        }
+        return StringEqual.defaultImpl(pl, type, key, key);
+    }
+
+    /**
+     * 装备一套合金盔甲
+     * @param pl
+     * @param slot
+     * @param item
+     * @returns {Promise<{pl, type, key}>}
+     */
+    static async netheriteImpl(pl, slot, item) {
+        const type = "armor";
+        const key = "netheriteAll";
+        let armors = pl.getArmor().getAllItems();
+        for (let armor of armors) {
+            if (armor.type.indexOf("netherite") === -1) {
+                return Promise.reject();
+            }
+        }
+        return StringEqual.defaultImpl(pl, type, key, key);
+    }
+
+    /**
+     * 装备鞘翅成就
+     * @param pl
+     * @param slot
+     * @param item
+     * @returns {Promise<{pl, type, key}>}
+     */
+    static async elytraImpl(pl, slot, item) {
+        if (slot !== 1 || item.type !== "minecraft:elytra") return Promise.reject();
+        const type = "armor";
+        const key = "preFly";
+        return StringEqual.defaultImpl(pl, type, key, key);
     }
 
 }
@@ -2554,7 +2805,8 @@ class BedEnter {
                     "cloudDream": new Achievement("云端之梦", "在云层之上睡一晚上"),
                     "undergroundDream": new Achievement("深渊之息", "在洞穴层睡一晚上"),
                     "normalDream": new Achievement("精神饱满", "安全的睡一晚上"),
-                    "rainDream": new Achievement("屋漏偏逢连夜雨", "在雨中睡一晚上")
+                    "rainDream": new Achievement("屋漏偏逢连夜雨", "在雨中睡一晚上"),
+                    "snowDream": new Achievement("冰雪之梦", "在雪中睡一晚上")
                 }, regx: {}
             }
         }, en_US: {}
@@ -2595,12 +2847,14 @@ class BedEnter {
         }
         if (pl.inRain) {
             key = "rainDream";
+        } else if (pl.inSnow) {
+            key = "snowDream";
         }
         //睡眠判断
         return BedEnter.asyncSleepValidate(pl).then(res => {
             if (res) {
                 LogUtils.debug("睡眠判定成功");
-                return StringEqual.defaultImpl(pl, type, key);
+                return StringEqual.defaultImpl(pl, type, key, type);
             }
         });
     }
@@ -2676,7 +2930,7 @@ class Ride {
 
     static async defaultImpl(pl, mob) {
         const type = "ride";
-        return StringEqual.defaultImpl(pl, type, mob.type);
+        return StringEqual.defaultImpl(pl, type, mob.type, type);
     }
 
 }
@@ -2703,7 +2957,7 @@ class ProjectileHitEntity {
         }, en_US: {}
     };
 
-    static EventImplList = ["shootDistanceImpl",];
+    static EventImplList = ["shootDistanceImpl", "fireBallGhastImpl"];
 
     /**
      * 生物被弹射物击中
@@ -2714,7 +2968,7 @@ class ProjectileHitEntity {
         if (Utils.hasNullOrUndefined(...arguments)) return;
         if (EventProcessor.antiEventShake(en, ProjectileHitEntity.EVENT)) return;//与其他事件不同的是，这里是给实体加检测而不是玩家
         LogUtils.debug(`参数列表:`, ...arguments);
-        LogUtils.debug(`事件:${ProjectileHitEntity.EVENT} 名称:实体被弹射物击中 实体:${en.type} 弹射物:${source.type}`);
+        LogUtils.debug(`事件:${ProjectileHitEntity.EVENT} 名称:实体被弹射物击中 实体:${en.type} 弹射物:${source.type} UID:${source.uniqueId}`);
         EventProcessor.eventImplsProcess(ProjectileHitEntity, [en, source], ProjectileHitEntity.EventImplList).catch(err => {
             LogUtils.error(`${ProjectileHitEntity.EVENT}: `, err);
         });
@@ -2726,6 +2980,7 @@ class ProjectileHitEntity {
      * @param source
      */
     static async shootDistanceImpl(en, source) {
+        if (source.type !== "minecraft:arrow") return;
         const type = "shootDistance";
         //获取绑定的玩家
         let xuid = RuntimeCache.getCache(source.uniqueId);
@@ -2739,6 +2994,14 @@ class ProjectileHitEntity {
         let res = NumberChange.defaultImpl(pl, type, distance, true);
         RuntimeCache.removeCache(source.uniqueId);
         return res;
+    }
+
+    static async fireBallGhastImpl(en, source) {
+        if (source.type !== "minecraft:fireball" && en.type !== "minecraft:ghast") return Promise.reject();
+        let xuid = RuntimeCache.getCache(source.uniqueId);//根据弹射物ID获取绑定的玩家
+        if (Utils.isNullOrUndefined(xuid)) return Promise.reject();
+        RuntimeCache.setCache(en.uniqueId, xuid);//将恶魂与玩家绑定
+        return Promise.reject();
     }
 }
 
@@ -3002,14 +3265,15 @@ class StringEqual {
 
     /**
      * 十分简单的逻辑，不能再简单了
-     * @param pl
-     * @param type
-     * @param key
+     * @param pl 玩家对象
+     * @param type 成就类型
+     * @param key 成就触发值
+     * @param tag 防抖tag 根据实际情况而定，有时候是key有时候是type
      * @returns {{pl, type, key}}
      */
-    static async defaultImpl(pl, type, key) {
+    static async defaultImpl(pl, type, key, tag) {
         //类型防抖
-        if (EventProcessor.antiEventShake(pl, type)) return Promise.reject();
+        if (EventProcessor.antiEventShake(pl, tag)) return Promise.reject();
         //如果击中缓存则说明该成就已经完成，不需要再去判断
         if (RuntimeCache.has(PlDataManager.getCacheKey(pl, type, key))) return Promise.reject();
         //获取词条类型
@@ -3057,7 +3321,7 @@ class SpecialType {
      * @returns {{pl, type, key}}
      */
     static async defaultStringImpl(pl, type, key) {
-        return StringEqual.defaultImpl(pl, type, key);
+        return StringEqual.defaultImpl(pl, type, key, key);
     }
 
 
@@ -3090,7 +3354,7 @@ class EventProcessor {
      * 记录了所有的事件处理class
      * @type {Array}
      */
-    static EVENT_PROCESSOR_LIST = [Join, Left, ChangeDim, Destroy, MobDie, PlDie, ScoreChange, ConsumeTotem, InventoryChange, UseBucketTake, DropItem, Eat, ArmorSet, BedEnter, Ride, ProjectileHitEntity, ProjectileCreated, PlayerChat, PlayerCmd, AfterFinished];
+    static EVENT_PROCESSOR_LIST = [Join, Left, ChangeDim, Destroy, Place, AttackEntity, MobDie, PlDie, ScoreChange, ConsumeTotem, InventoryChange, UseBucketTake, DropItem, Eat, ArmorSet, BedEnter, Ride, ProjectileHitEntity, ProjectileCreated, PlayerChat, PlayerCmd, AfterFinished];
 
     /**
      * pl - 玩家对象
