@@ -50,7 +50,8 @@ const DEFAULT_CONFIG = {
         }
     }, antiShake: 400, //防抖粒度
     checkUpdate: true,//检查更新
-    debug: true//调试模式
+    debug: true,//调试模式
+    "a": "A"
 };
 
 /**
@@ -280,6 +281,29 @@ class IO {
                 reject(e);
             }
         });
+    }
+
+    /**
+     * 克隆目录
+     * @param targetPath
+     * @param sourcePath
+     */
+    static cloneDir(sourcePath, targetPath) {
+        LogUtils.debug(targetPath);
+        LogUtils.debug(sourcePath);
+        let isExist = File.exists(targetPath);
+        LogUtils.debug(isExist);
+        if (isExist) return;
+        File.createDir(targetPath);
+        File.copy(sourcePath, targetPath);
+        let fileList = File.getFilesList(sourcePath);
+        for (let file of fileList) {
+            let subSourcePath = Path.concatDir(sourcePath, file);
+            if (File.checkIsDir(subSourcePath)) {
+                let subTargetPath = Path.concatDir(targetPath, file);
+                this.cloneDir(subSourcePath, subTargetPath);
+            }
+        }
     }
 
 }
@@ -728,7 +752,7 @@ class Path {
      * 备份目录
      * @type {string}
      */
-    static backUpDir = `${this.ROOT_DIR}/Temp`;
+    static BACK_UP = `./plugins/Achievement_Backup`;
 
     /**
      * 玩家数据文件
@@ -755,6 +779,15 @@ class Path {
      */
     static JSON_SUFFIX = ".json";
 
+    static FILE_SP = "/";
+
+    static concatDir(...paths) {
+        return paths.join(this.FILE_SP) + this.FILE_SP;
+    }
+
+    static concatFile(...paths) {
+        return paths.join(this.FILE_SP);
+    }
 }
 
 /**
@@ -1158,6 +1191,7 @@ class Configuration {
         });
     }
 
+
     /**
      * 更新配置文件
      * @returns {Promise<void>}
@@ -1176,10 +1210,10 @@ class Configuration {
             if (Utils.isNullOrUndefined(cacheVersion) || cacheVersion === PLUGINS_INFO.version) {
                 isNeedToUpdateData = false;
             }
+            LogUtils.debug("检测到插件版本与本地缓存版本不一致，即将开始备份，随后将更新本地文件");
+            this.backup();
         });
-
         if (!isNeedToUpdateData) return;
-
         //更新配置,配置文件必须保持与默认的格式严格一致
         const configUpdate = IO.isNotExistsAsync(Path.CONFIG_PATH).then(res => {
             if (res) return;
@@ -1201,6 +1235,17 @@ class Configuration {
         });
     }
 
+
+    /**
+     * 备份插件数据
+     */
+    static backup() {
+        let date = new Date();
+        let backPath = `${Path.BACK_UP}/${date.getFullYear()}_${date.getMonth() + 1}_${date.getDate()}_${date.getHours()}_${date.getMinutes()}_${date.getSeconds()}/`;
+        let sourcePath = `${Path.ROOT_DIR}/`;
+        IO.cloneDir(sourcePath, backPath);
+        LogUtils.debug(`备份成功保存在路径:${backPath}`);
+    }
 
     /**
      * 主要负责从配置文件中读取数据
@@ -2160,7 +2205,9 @@ class Join {
             [SpecialType.TYPE]: {
                 enable: true, name: "特殊成就", details: {
                     join: new Achievement("Hello World!", "首次进入服务器"),
-                }, regx: {}
+                }, regx: {
+                    "a": "b", "c": "d"
+                }
             }
         }, en_US: {}
     };
