@@ -51,7 +51,7 @@ const DEFAULT_CONFIG = {
     }, antiShake: 400, //防抖粒度
     checkUpdate: true,//检查更新
     debug: true,//调试模式
-    "a": "A"
+    "a": "C",
 };
 
 /**
@@ -119,6 +119,8 @@ const Constant = {
                 currentLang: "当前语言为: ${}",
                 initialData: "初始运行时数据: ${}",
                 initEntryCount: "成就插件成功加载,总计${}种成就类型,${}个成就词条,${}个事件监听",
+                backUp: "检测到插件版本与本地缓存版本不一致，即将开始备份，随后将更新本地文件",
+                backUpSuccess: "备份成功保存在路径:",
                 initError: "插件启动异常: "
             }, IO: {
                 readJsonNull: "路径: ${path} JSON读取为: ${buffer}",
@@ -289,10 +291,7 @@ class IO {
      * @param sourcePath
      */
     static cloneDir(sourcePath, targetPath) {
-        LogUtils.debug(targetPath);
-        LogUtils.debug(sourcePath);
         let isExist = File.exists(targetPath);
-        LogUtils.debug(isExist);
         if (isExist) return;
         File.createDir(targetPath);
         File.copy(sourcePath, targetPath);
@@ -517,14 +516,15 @@ class Utils {
      * 多用于自动更新配置文件
      * @param source 源对象
      * @param target 目标对象
+     * @param deleted 是否进行删除
      */
-    static checkDifferences(source, target) {
+    static checkDifferences(source, target, deleted) {
 
         for (let key in target) {
-            if (source[key] === undefined) {
+            if (source[key] === undefined && deleted) {
                 delete target[key];
             } else if (this.isJsObject(target[key])) {
-                this.checkDifferences(source[key], target[key]);
+                this.checkDifferences(source[key], target[key], deleted);
             }
         }
 
@@ -532,7 +532,7 @@ class Utils {
             if (target[key] === undefined) {
                 target[key] = source[key];
             } else if (this.isJsObject(target[key])) {
-                this.checkDifferences(source[key], target[key]);
+                this.checkDifferences(source[key], target[key], deleted);
             }
         }
     }
@@ -1127,10 +1127,11 @@ class Configuration {
      * 用于异步更新一个配置文件并保存
      * @param path
      * @param newData
+     * @param deleted
      */
-    static checkUpdateAndSave(path, newData) {
+    static checkUpdateAndSave(path, newData, deleted) {
         return IO.readJsonFileAsync(path).then(result => {
-            Utils.checkDifferences(newData, result);
+            Utils.checkDifferences(newData, result, deleted);
             return IO.writeJsonFileAsync(path, result);
         });
     }
@@ -1207,17 +1208,16 @@ class Configuration {
         }).then(() => {
             let cacheVersion = PersistentCache.get(Constant.version);
             //如果缓存中没有版本信息或者与当前版本一致则没有必要更新数据
-            if (Utils.isNullOrUndefined(cacheVersion) || cacheVersion === PLUGINS_INFO.version) {
+            if (!cacheVersion || cacheVersion === PLUGINS_INFO.version) {
                 isNeedToUpdateData = false;
             }
-            LogUtils.debug("检测到插件版本与本地缓存版本不一致，即将开始备份，随后将更新本地文件");
-            this.backup();
         });
         if (!isNeedToUpdateData) return;
+        this.backupPluginsData();
         //更新配置,配置文件必须保持与默认的格式严格一致
         const configUpdate = IO.isNotExistsAsync(Path.CONFIG_PATH).then(res => {
             if (res) return;
-            return this.checkUpdateAndSave(Path.CONFIG_PATH, DEFAULT_CONFIG);
+            return this.checkUpdateAndSave(Path.CONFIG_PATH, DEFAULT_CONFIG, true);
         }).then(res => {
             if (res) LogUtils.debug(Runtime.SystemInfo.init.configUpdate);
         });
@@ -1227,7 +1227,7 @@ class Configuration {
             if (res) return;
             return LangManager.updateLangFile(LANG);
         }).then(() => {
-            LogUtils.debug(Runtime.SystemInfo.init.langUpdate);
+            LogUtils.debug(Runtime.SystemInfo.init.langUpdate, false);
         });
 
         await Promise.all([configUpdate, langUpdate]).catch(err => {
@@ -1239,12 +1239,13 @@ class Configuration {
     /**
      * 备份插件数据
      */
-    static backup() {
+    static backupPluginsData() {
+        LogUtils.info(Runtime.SystemInfo.init.backUp);
         let date = new Date();
         let backPath = `${Path.BACK_UP}/${date.getFullYear()}_${date.getMonth() + 1}_${date.getDate()}_${date.getHours()}_${date.getMinutes()}_${date.getSeconds()}/`;
         let sourcePath = `${Path.ROOT_DIR}/`;
         IO.cloneDir(sourcePath, backPath);
-        LogUtils.debug(`备份成功保存在路径:${backPath}`);
+        LogUtils.debug(Runtime.SystemInfo.init.backUpSuccess + backPath);
     }
 
     /**
@@ -1599,7 +1600,6 @@ class DisplayManager {
      * @param entry
      */
     async chatBarDisplay(pl, entry) {
-        LogUtils.debug(JSON.stringify(entry));
         if (!this.chatBar.enable) return;
         let finalMsg = Utils.loadTemplate(Runtime.menu.display.chatBar, pl.name, entry.msg, entry.condition);
         LogUtils.debug(Utils.loadTemplate(Runtime.SystemInfo.display.chatBar, this.scope, pl.name, finalMsg));
@@ -1772,7 +1772,7 @@ class AchievementManager {
      * @returns {boolean}
      */
     static paramsValidate(...params) {
-        LogUtils.debug("参数列表: ", ...arguments);
+        LogUtils.debug("请求参数列表: ", ...arguments);
         //参数校验
         if (Utils.hasNullOrUndefined(...arguments)) {
             LogUtils.debug("请求参数校验不通过");
@@ -1812,7 +1812,7 @@ class AchievementManager {
         let mapEntry = LangManager.getAchievementEntry(type, trigger);
         //是否存在
         if (Utils.isNullOrUndefined(mapEntry)) {
-            LogUtils.debug("成就词条不可用");
+            LogUtils.debug("检测到成就词条不可用");
             return undefined;
         }
         //判断该词条是否启用
@@ -2006,14 +2006,18 @@ class NumberChange {
      * @returns {Promise<never>|Promise<*[]>|Promise<{pl, type, key: string}>}
      */
     static defaultImpl(pl, type, num, multipart) {
+        LogUtils.debug("数字成就实现");
+        LogUtils.debug(1);
         //防抖
-        if (Utils.isShaking(pl, type)) return Promise.reject();
+        if (EventProcessor.antiEventShake(pl, type)) return Promise.reject();
         //计分板防抖
-        EventProcessor.antiEventShake(pl, type);
+        LogUtils.debug(3);
         //获取词条类型
         let entryType = LangManager.getAchievementEntryType(type);
+        LogUtils.debug(4);
         //判断对应数字类型的成就是否存在或者是否启用
         if (!entryType || !entryType.enable) return Promise.reject();
+        LogUtils.debug(5);
         //最后进行数字逻辑处理
         return multipart ? NumberChange.multipartImpl(pl, type, num, entryType) : NumberChange.singleImpl(pl, type, num, entryType);
     }
@@ -2116,6 +2120,7 @@ class StringEqual {
      * @returns {{pl, type, key}}
      */
     static async defaultImpl(pl, type, key, tag) {
+        LogUtils.debug("字符串实现");
         LogUtils.debug("1");
         //类型防抖
         if (EventProcessor.antiEventShake(pl, tag)) return Promise.reject();
@@ -2206,7 +2211,7 @@ class Join {
                 enable: true, name: "特殊成就", details: {
                     join: new Achievement("Hello World!", "首次进入服务器"),
                 }, regx: {
-                    "a": "b", "c": "d"
+                    "v": "a"
                 }
             }
         }, en_US: {}
@@ -3551,7 +3556,7 @@ class Application {
 
 Application.main();
 
-const Banner = "\n" + "              _     _                                     _          ___    ___   ___  \n" + "    /\\       | |   (_)                                   | |        |__ \\  / _ \\ / _ \\ \n" + "   /  \\   ___| |__  _  _____   _____ _ __ ___   ___ _ __ | |_  __   __ ) || | | | | | |\n" + "  / /\\ \\ / __| '_ \\| |/ _ \\ \\ / / _ \\ '_ ` _ \\ / _ \\ '_ \\| __| \\ \\ / // / | | | | | | |\n" + " / ____ \\ (__| | | | |  __/\\ V /  __/ | | | | |  __/ | | | |_   \\ V // /_ | |_| | |_| |\n" + "/_/    \\_\\___|_| |_|_|\\___| \\_/ \\___|_| |_| |_|\\___|_| |_|\\__|   \\_/|____(_)___(_)___/    By Stranger \n";
+const Banner = "\n" + "              _     _                                     _          ___    ___   ___  \n" + "    /\\       | |   (_)                                   | |        |__ \\  / _ \\ / _ \\ \n" + "   /  \\   ___| |__  _  _____   _____ _ __ ___   ___ _ __ | |_  __   __ ) || | | | | | |\n" + "  / /\\ \\ / __| '_ \\| |/ _ \\ \\ / / _ \\ '_ ` _ \\ / _ \\ '_ \\| __| \\ \\ / // / | | | | | | |\n" + " / ____ \\ (__| | | | |  __/\\ V /  __/ | | | | |  __/ | | | |_   \\ V // /_ | |_| | |_| |\n" + "/_/    \\_\\___|_| |_|_|\\___| \\_/ \\___|_| |_| |_|\\___|_| |_|\\__|   \\_/|____(_)___(_)___/\n";
 
 
 LogUtils.info(Banner);
