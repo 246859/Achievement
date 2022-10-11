@@ -51,7 +51,6 @@ const DEFAULT_CONFIG = {
     }, antiShake: 400, //防抖粒度
     checkUpdate: true,//检查更新
     debug: true,//调试模式
-    "a": "C",
 };
 
 /**
@@ -78,7 +77,10 @@ const LANG = {
  */
 
 const Constant = {
-    version: "achi_version", moneyType: {
+    version: "achi_version",
+    typeCount: "typeCount",
+    totalCount: "totalCount",
+    moneyType: {
         score: "score", llmoney: "llmoney"
     }, langType: {
         zh_CN: "zh_CN", en_US: "en_US"
@@ -519,7 +521,10 @@ class Utils {
      * @param deleted 是否进行删除
      */
     static checkDifferences(source, target, deleted) {
-
+        // LogUtils.debug("source", JSON.stringify(source));
+        // LogUtils.debug("target", JSON.stringify(target));
+        // LogUtils.debug("----------------------------------------------------------------------------");
+        if (!source || !target) return;
         for (let key in target) {
             if (source[key] === undefined && deleted) {
                 delete target[key];
@@ -809,36 +814,29 @@ class LangManager {
      * @returns {{en_US: {}, zh_CN: {}}}
      */
     static collectEntry() {
-        let entry = {
-            zh_CN: {}, en_US: {}
-        };
-        //记录成就类型数量
+        let entry = {};
+        //将所有事件的词条收集到entry中
         EventProcessor.EVENT_PROCESSOR_LIST.forEach(processor => {
             if (!processor.ENTRY) return;
-            for (let langKey in processor.ENTRY) {
-                for (let achi_type in processor.ENTRY[langKey]) {
-                    //entry中不存在此成就类型
-                    if (!entry[langKey][achi_type]) {
-                        //记录成就种类数量
-                        Runtime.entryTypeTotalCounts++;
-                        //将此成就类型复制给entry中
-                        entry[langKey][achi_type] = processor.ENTRY[langKey][achi_type];
-
-                    } else {
-                        for (let key in processor.ENTRY[langKey][achi_type].details) {
-                            entry[langKey][achi_type].details[key] = processor.ENTRY[langKey][achi_type].details[key];
-                        }
-                        for (let key in processor.ENTRY[langKey][achi_type].regx) {
-                            entry[langKey][achi_type].regx[key] = processor.ENTRY[langKey][achi_type].regx[key];
-                        }
-                    }
-                    Runtime.entryTotalCounts += Object.keys(entry[langKey][achi_type].details).length;
-                }
-            }
+            LogUtils.debug(processor.EVENT);
+            Utils.checkDifferences(processor.ENTRY, entry, false);
         });
 
         return entry;
     }
+
+    /**
+     * 统计词条信息
+     * @param entry
+     */
+    static statisticEntry(entry) {
+        let lang_zh = entry[Constant.langType.zh_CN];
+        Runtime.entryTypeTotalCounts = Object.keys(lang_zh).length;
+        for (let type in lang_zh) {
+            Runtime.entryTotalCounts += Object.keys(lang_zh[type].details).length;
+        }
+    }
+
 
     /**
      * 获取一个词条对象的缓存键值
@@ -940,6 +938,7 @@ class LangManager {
      */
     static collectLangEntry(langGroup) {
         let entry = this.collectEntry();
+        this.statisticEntry(entry);
         for (let langKey in langGroup) {
             langGroup[langKey].Entry = entry[langKey];
         }
@@ -1025,7 +1024,7 @@ class LangManager {
     static updateLangFile(langGroup) {
         return this.langGroupIterator(langGroup, () => {
         }, (path, fileName, data) => {
-            return Configuration.checkUpdateAndSave(path, data);
+            return Configuration.checkUpdateAndSave(path, data, false);
         });
     }
 
@@ -1208,9 +1207,7 @@ class Configuration {
         }).then(() => {
             let cacheVersion = PersistentCache.get(Constant.version);
             //如果缓存中没有版本信息或者与当前版本一致则没有必要更新数据
-            if (!cacheVersion || cacheVersion === PLUGINS_INFO.version) {
-                isNeedToUpdateData = false;
-            }
+            if (!cacheVersion || cacheVersion === PLUGINS_INFO.version) isNeedToUpdateData = false;
         });
         if (!isNeedToUpdateData) return;
         this.backupPluginsData();
@@ -1227,7 +1224,11 @@ class Configuration {
             if (res) return;
             return LangManager.updateLangFile(LANG);
         }).then(() => {
-            LogUtils.debug(Runtime.SystemInfo.init.langUpdate, false);
+
+            let newTypeCount = Runtime.entryTypeTotalCounts - PersistentCache.get(Constant.typeCount);
+            let newTotalCount = Runtime.entryTotalCounts - PersistentCache.get(Constant.totalCount);
+            LogUtils.debug(Runtime.SystemInfo.init.langUpdate);
+            LogUtils.info(`累计新增 ${newTypeCount} 种成就类型, ${newTotalCount} 个成就词条`);
         });
 
         await Promise.all([configUpdate, langUpdate]).catch(err => {
@@ -1245,7 +1246,7 @@ class Configuration {
         let backPath = `${Path.BACK_UP}/${date.getFullYear()}_${date.getMonth() + 1}_${date.getDate()}_${date.getHours()}_${date.getMinutes()}_${date.getSeconds()}/`;
         let sourcePath = `${Path.ROOT_DIR}/`;
         IO.cloneDir(sourcePath, backPath);
-        LogUtils.debug(Runtime.SystemInfo.init.backUpSuccess + backPath);
+        LogUtils.info(Runtime.SystemInfo.init.backUpSuccess + backPath);
     }
 
     /**
@@ -1275,6 +1276,9 @@ class Configuration {
         });
     }
 
+    /**
+     * 预准备数据
+     */
     static prepareData() {
         try {
             LangManager.collectLang(LANG);
@@ -1284,6 +1288,19 @@ class Configuration {
             LogUtils.error(err);
             throw err;
         }
+    }
+
+
+    /**
+     * 插件初始化完成后的数据处理
+     */
+    static postData() {
+        //将版本信息写入缓存
+        PersistentCache.set(Constant.version, PLUGINS_INFO.version);
+        //将成就类型数量写入缓存中
+        PersistentCache.set(Constant.typeCount, Runtime.entryTypeTotalCounts);
+        //将词条类型数量写入缓存中
+        PersistentCache.set(Constant.totalCount, Runtime.entryTotalCounts);
     }
 
     /**
@@ -2210,9 +2227,7 @@ class Join {
             [SpecialType.TYPE]: {
                 enable: true, name: "特殊成就", details: {
                     join: new Achievement("Hello World!", "首次进入服务器"),
-                }, regx: {
-                    "v": "a"
-                }
+                }, regx: {}
             }
         }, en_US: {}
     };
@@ -3543,8 +3558,8 @@ class Application {
         Configuration.init().then(() => {
             //注册事件
             EventProcessor.registerMcEvent();
-            //将版本信息写入缓存
-            PersistentCache.set(Constant.version, PLUGINS_INFO.version);
+            //插件初始化成功后进行的一些数据处理
+            Configuration.postData();
             LogUtils.info(Utils.loadTemplate(Runtime.SystemInfo.init.currentLang, Runtime.config.language));
             LogUtils.info(Utils.loadTemplate(Runtime.SystemInfo.init.initEntryCount, Runtime.entryTypeTotalCounts, Runtime.entryTotalCounts, EventProcessor.EVENT_PROCESSOR_LIST.length));
 
