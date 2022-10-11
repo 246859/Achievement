@@ -130,6 +130,7 @@ const Constant = {
                 shake: "achieve anti-shake pass",
                 status: "Achievement status not completed",
                 update: "Achievement status modified successfully",
+                exist: "This achievement entry exists",
                 nonExistentEntry: "Achievement entry that does not exist",
             }, reward: {
                 economyInfo: "Economy Reward Object: ${pl.name} Type: ${economy.type} Value: ${economy.value}",
@@ -144,6 +145,7 @@ const Constant = {
                 dirInit: "The plugin directory is created",
                 data: "Player data file created",
                 config: "The plugin configuration file is created",
+                cache: "The plugin cache file is created",
                 lang: "Language file created",
                 configurationError: "Plugin configuration file initialization exception: ",
                 configUpdate: "The configuration file information has been updated",
@@ -151,17 +153,23 @@ const Constant = {
                 updateError: "Failed to update plugin configuration information",
                 runtimeData: "The plugin runtime configuration is loaded",
                 runtimeLang: "The plugin runtime language is loaded",
+                persistenceCache: "Plugin cache data loaded successfully",
                 runtimePlData: "The player data is loaded when the plugin is running",
                 runtimeError: "plugin runtime data loading exception: ",
                 currentLang: "The current language is: ${}",
                 initialData: "Initial runtime data: ${}",
-                initEntryCount: "Successfully loaded ${} achievement types, with a total of ${} achievement entries",
-                initError: "Plugin startup exception: "
+                initEntryCount: "Achievement plugin successfully loaded, a total of ${} achievement types, ${} achievement entries, ${} event listeners",
+                backUp: "Detected that the plugin version is inconsistent with the local cached version, the backup is about to start, and then the local file will be updated",
+                backUpSuccess: "Backup successfully saved in path:",
+                initError: "Plugin startup exception: ",
+                invalidType: "Invalid achievement type: ",
+                langDir: "The current language load directory is: ",
+                langFile: "Successfully loaded language file: ",
             }, IO: {
                 readJsonNull: "Path: ${path} JSON read as: ${buffer}",
                 readJsonError: "Path: ${path} JSON read exception: ",
                 writeJsonError: "path: ${path} JSON write exception: "
-            }
+            },
         }
     }
 };
@@ -799,7 +807,6 @@ class LangManager {
      */
     static collectLang(langGroup) {
         this.collectLangEntry(langGroup);
-        this.collectLangMenu(langGroup);
     }
 
     /**
@@ -828,6 +835,16 @@ class LangManager {
             if (details) Runtime.entryTotalCounts += Object.keys(entry[type].details).length;
             else LogUtils.error(Runtime.SystemInfo.init.invalidType, type);
         }
+    }
+
+    /**
+     * 获取成就统计信息
+     */
+    static getAchievementStatistic() {
+        return {
+            entryCount: Runtime.entryTotalCounts,
+            typeCount: Runtime.entryTotalCounts
+        };
     }
 
 
@@ -936,10 +953,6 @@ class LangManager {
         }
     }
 
-
-    static collectLangMenu() {
-
-    }
 
     static getLangTypeDir(langType) {
         return `${Path.LANG_DIR}/${langType}`;
@@ -2215,7 +2228,13 @@ class Join {
                     join: new Achievement("Hello World!", "首次进入服务器"),
                 }, regx: {}
             }
-        }, en_US: {}
+        }, en_US: {
+            [SpecialType.TYPE]: {
+                enable: true, name: "Special Achievement", details: {
+                    join: new Achievement("Hello World!", "Enter the server for the first time"),
+                }, regx: {}
+            }
+        }
     };
 
 
@@ -2296,7 +2315,15 @@ class ChangeDim {
                     "2": new Achievement("永恒、无星暗夜的维度", "到达末地")
                 }, regx: {}
             }
-        }, en_US: {}
+        }, en_US: {
+            changeDim: {
+                enable: true, name: "Dimension Achievement", details: {
+                    "0": new Achievement("What a wonderful world", "Return to the main world"),
+                    "1": new Achievement("Hell is empty, the devil is on earth", "Arrived in hell"),
+                    "2": new Achievement("The dimension of the eternal, starless night", "reach the end")
+                }, regx: {}
+            }
+        }
     };
 
     /**
@@ -2359,7 +2386,36 @@ class Destroy {
                 }
             },
 
-        }, en_US: {}
+        }, en_US: {
+            destroyBlock: {
+                enable: true, name: "Mining Achievement", details: {
+                    "minecraft:log": new Achievement("To get rich, first smash trees!", "First cut down logs"),
+                    "minecraft:stone": new Achievement("Crazy Stone!", "First Stone Mining"),
+                    "minecraft:coal_ore": new Achievement("The face is full of dust and fireworks, the temples are black and the fingers are black", "The first coal mine was dug"),
+                    "minecraft:iron_ore": new Achievement("Come harder!", "Mine iron ore for the first time"),
+                    "minecraft:gold_ore": new Achievement("Gold Miner, Gold Spirit!", "First Gold Mining"),
+                    "minecraft:diamond_ore": new Achievement("Who doesn't like diamonds?", "First gold mining"),
+                    "minecraft:ancient_debris": new Achievement("Ancient Debris", "First Excavation of Ancient Debris"),
+                    "minecraft:lapis_ore": new Achievement("It's time to enchant!", "First time to mine lapis lazuli"),
+                    "minecraft:redstone_ore": new Achievement("The server feels a little danger", "Mine redstone mine for the first time"),
+                    "minecraft:copper_ore": new Achievement("What's the use of this thing?", "The first copper mine was mined"),
+                    "minecraft:emerald_ore": new Achievement("Villager Catcher", "First Emerald Mining"),
+                    "minecraft:end_stone": new Achievement("Void block", "First excavation of end rock"),
+                    "minecraft:netherrack": new Achievement("Dirty objects covered in corrupt flesh", "First excavation of netherrack"),
+                    "minecraft:glass": new Achievement("Beautiful things are for breaking", "Breaking glass for the first time"),
+                    "minecraft:stained_glass": new Achievement("Even if it is stained, beautiful things are still used to destroy", "The first time to destroy stained glass"),
+                    "minecraft:obsidian": new Achievement("Obsidian Song", "First Obsidian Mining"),
+                    "minecraft:bedrock": new Achievement("You guy cheated, didn't you", "Destroy bedrock for the first time"),
+                    "minecraft:grass": new Achievement("Grass! (a plant)", "Mine grass blocks for the first time"),
+                    "minecraft:bee_nest": new Achievement("Buzz~ trouble is coming", "First time destroying the hive"),
+                    "minecraft:amethyst_block": new Achievement("Beautiful and charming Amethyst", "First Destruction of Amethyst Mother Rock"),
+                    "minecraft:leaves": new Achievement("A certain Swede: How dare you !", "First cut leaves"),
+                }, regx: {
+                    "minecraft:log": "minecraft:log"
+                }
+            },
+
+        }
     };
 
     static EventImplList = ["defaultImpl"];
@@ -2410,7 +2466,21 @@ class Place {
                     "_sign": "minecraft:sign"
                 }
             }
-        }, en_US: {}
+        }, en_US: {
+            place: {
+                enable: true, name: "Place Achievement", details: {
+                    "minecraft:flower_pot": new Achievement("Prepare for gardening", "Place a flowerpot"),
+                    "minecraft:sapling": new Achievement("Environmental work", "Planting a sapling"),
+                    "minecraft:sign": new Achievement("Tell the big guys!", "Place a sign"),
+                    "minecraft:bell": new Achievement("dong dong dong", "Place a bell"),
+                    "minecraft:tnt": new Achievement("Prepare to do something bad", "Place TNT"),
+                    "minecraft:beacon": new Achievement("You can see from a distance", "Place a beacon"),
+                    "minecraft:brewing_stand": new Achievement("Alchemy time is up", "Place a brewing stand"),
+                }, regx: {
+                    "_sign": "minecraft:sign"
+                }
+            }
+        }
     };
 
     static EventImplList = ["defaultImpl"];
@@ -2475,7 +2545,42 @@ class PlDie {
                     "minecraft:panda": new Achievement("功夫熊猫", "死于熊猫"),
                 }, regx: {}
             }
-        }, en_US: {}
+        }, en_US: {
+            death: {
+                enable: true, name: "Death Achievement", details: {
+                    "minecraft:creeper": new Achievement("Sudden surprise!", "Death to creeper"),
+                    "minecraft:zombie": new Achievement("Falled in corpse tide", "died by zombies"),
+                    "minecraft:skeleton": new Achievement("Middle Door vs. Spy", "Death to Xiaobai"),
+                    "minecraft:stray": new Achievement("Annoying slowdown!", "Death to a stray"),
+                    "minecraft:zombie_pigman": new Achievement("Why?", "Dead to Zombie Pigman"),
+                    "minecraft:drowned": new Achievement("Shadows lurking underwater", "Death by drowned"),
+                    "minecraft:elder_guardian": new Achievement("Deep Sea Behemoth", "Death to the Elder Guard"),
+                    "minecraft:ghast": new Achievement("Devil May Cry", "Death by Ghast"),
+                    "minecraft:slime": new Achievement("Slime fell from the sky", "Death to slime"),
+                    "minecraft:magma_cube": new Achievement("The Terrible Magma Cube", "Death to the Magma Cube"),
+                    "minecraft:guardian": new Achievement("Little Follower", "Death by Guardian"),
+                    "minecraft:shulker": new Achievement("Smart!", "Death to a shulker"),
+                    "minecraft:witch": new Achievement("Don't underestimate her", "Die a witch"),
+                    "minecraft:wither_skeleton": new Achievement("Knight of Hell", "Death wither Skeleton"),
+                    "minecraft:vex": new Achievement("Angels descended", "Death by vexes"),
+                    "minecraft:phantom": new Achievement("Peaceful Dream", "Death by Phantom"),
+                    "minecraft:zombie_villager": new Achievement("Join our wonderful family", "Death to zombie villagers"),
+                    "minecraft:silverfish": new Achievement("Death to the ground", "Death to cystworm"),
+                    "minecraft:pillager": new Achievement("Crazy Plunder", "Death by the Mob"),
+                    "minecraft:ravager": new Achievement("Death by Crash", "Death by Raavager"),
+                    "minecraft:spider": new Achievement("face hugger", "death to spider"),
+                    "minecraft:cave_spider": new Achievement("Poisonous Face Hugger", "Death to Cave Spider"),
+                    "minecraft:enderman": new Achievement("Dare to look at me?", "Death to enderman"),
+                    "minecraft:piglin": new Achievement("Forgot to bring money", "Die to piglin"),
+                    "minecraft:endermite": new Achievement("Little Guy", "Death to Endermite"),
+                    "minecraft:ender_dragon": new Achievement("Ender Dragon: No, that's all?", "Death to the Ender Dragon"),
+                    "minecraft:wither": new Achievement("Wither: isn't it, that's all?", "Death wither"),
+                    "minecraft:player": new Achievement("died by murder", "died by player"),
+                    "minecraft:dolphin": new Achievement("Karma", "Death to Dolphin"),
+                    "minecraft:panda": new Achievement("Kung Fu Panda", "Death to Panda"),
+                }, regx: {}
+            }
+        }
     };
 
     static EventImplList = ["defaultImpl"];
@@ -2506,6 +2611,13 @@ class AttackEntity {
             [SpecialType.TYPE]: {
                 enable: true, name: "特殊成就", details: {
                     "counterattack": new Achievement("自食其果", "将恶魂的火球反弹击杀恶魂")
+                }, regx: {}
+            }
+        },
+        en_US: {
+            [SpecialType.TYPE]: {
+                enable: true, name: "Special Achievement", details: {
+                    "counterattack": new Achievement("Bounce the ghast", "Bounce the ghast's fireball to kill the ghast")
                 }, regx: {}
             }
         }
@@ -2586,7 +2698,47 @@ class MobDie {
                     "minecraft:villager_v2": new Achievement("死不足惜", "首次击杀村民")
                 }, regx: {}
             },
-        }, en_US: {}
+        }, en_US: {
+            killer: {
+                enable: true, name: "Kill Achievement", details: {
+                    "minecraft:creeper": new Achievement("Sh~hh~", "Kill Creeper for the first time"),
+                    "minecraft:zombie": new Achievement("Zombie Siege", "First time kill a zombie"),
+                    "minecraft:skeleton": new Achievement("Dongfeng Express, the mission must be reached", "Kill Xiaobai for the first time"),
+                    "minecraft:stray": new Achievement("You like to fly kites, right", "Kill a stray for the first time"),
+                    "minecraft:zombie_pigman": new Achievement("Is it a pig? Or a zombie?", "Kill a zombie pigman for the first time"),
+                    "minecraft:drowned": new Achievement("Toolman with tridents", "Kill a drowned for the first time"),
+                    "minecraft:elder_guardian": new Achievement("Exhausted", "Kill the Elder Guardian for the first time"),
+                    "minecraft:ghast": new Achievement("Devil's Tears", "First ghast kill"),
+                    "minecraft:slime": new Achievement("Slimy", "First time kill a slime"),
+                    "minecraft:magma_cube": new Achievement("Walking Magma", "Kill a magma cube for the first time"),
+                    "minecraft:shulker": new Achievement("Small things, great wisdom", "Kill a shulker for the first time"),
+                    "minecraft:witch": new Achievement("Wicked Witch", "First kill witch"),
+                    "minecraft:wither_skeleton": new Achievement("Trickier, scarier, wither", "First kill wither skeleton"),
+                    "minecraft:vex": new Achievement("Abominable Angel or Demon", "Kill a Vex for the first time"),
+                    "minecraft:phantom": new Achievement("Don't sleep, bad baby", "Kill a phantom for the first time"),
+                    "minecraft:zombie_villager": new Achievement("Resident Evil", "Kill a zombie villager for the first time"),
+                    "minecraft:silverfish": new Achievement("Disgusting little guy", "Kill the first cystworm"),
+                    "minecraft:pillager": new Achievement("Peace Breaker", "First Mob Kill"),
+                    "minecraft:ravager": new Achievement("A Ravager", "First kill of a ravager"),
+                    "minecraft:spider": new Achievement("Climb walls, trees, buildings", "Kill a spider for the first time"),
+                    "minecraft:cave_spider": new Achievement("Beware of poison", "Kill a cave spider for the first time"),
+                    "minecraft:enderman": new Achievement("Look at you", "Kill an enderman for the first time"),
+                    "minecraft:piglin": new Achievement("Hell's Merchant", "First Piglin Kill"),
+                    "minecraft:endermite": new Achievement("Blackie's Favorite", "Kill endermite for the first time"),
+                    "minecraft:ender_dragon": new Achievement("Ender dragon? No, that's it?", "First kill of an ender dragon"),
+                    "minecraft:wither": new Achievement("Wither? Isn't that right?", "First kill wither"),
+                    "minecraft:player": new Achievement("You murdered a player!", "First kill player"),
+                    "minecraft:dolphin": new Achievement("Psychopath", "First Dolphin Kill"),
+                    "minecraft:panda": new Achievement("Illegal Hunting", "First Panda Kill"),
+                    "minecraft:chicken": new Achievement("What are you doing~Ouch~", "The first kill is only because of"),
+                    "minecraft:sheep": new Achievement("Who will kill the docile and cute sheep?", "Kill Mianyang for the first time"),
+                    "minecraft:goat": new Achievement("Goat Crash", "First Goat Kill"),
+                    "minecraft:pig": new Achievement("Like yours", "Kill a pig for the first time"),
+                    "minecraft:cow": new Achievement("Brave cow, not afraid of difficulties", "Kill the cow for the first time"),
+                    "minecraft:villager_v2": new Achievement("Death is not a pity", "Kill a villager for the first time")
+                }, regx: {}
+            },
+        }
     };
 
     static EventImplList = ["defaultImpl", "ghastDieImpl"];
@@ -2644,7 +2796,14 @@ class MobHurt {
                     "yidao999": new Achievement("是兄弟就来砍我，血战攻沙，一刀999", "单次攻击造成999点伤害"),
                 }, regx: {}
             }
-        }, en_US: {}
+        }, en_US: {
+            [SpecialType.TYPE]: {
+                enable: true, details: {
+                    "littleHurt": new Achievement("It hurts a little bit", "15 damage in a single attack"),
+                    "yidao999": new Achievement("I'm a brother, come and chop me, fight the sand, 999 with a knife", "A single attack deals 999 damage"),
+                }, regx: {}
+            }
+        }
     };
 
     static EventImplList = ["defaultImpl"];
@@ -2696,7 +2855,19 @@ class ScoreChange {
                     "${}>=100000000": new Achievement("亿万富翁", "经济达到10000w")
                 }, regx: {}
             },
-        }, en_US: {}
+        }, en_US: {
+            "ScoreMoney": {
+                enable: true, name: "Economic Achievement", details: {
+                    "${}<=0": new Achievement("Big loser", "Economy reaches 0"),
+                    "${}>=1000": new Achievement("Subsistence allowances", "Economy reaches 1k"),
+                    "${}>=10000": new Achievement("Humble social animal", "Economy reaches 1w"),
+                    "${}>=100000": new Achievement("Well-off life", "Economy reaches 10w"),
+                    "${}>=1000000": new Achievement("Millionaire", "Economy reaches 100w"),
+                    "${}>=10000000": new Achievement("Millionaire", "Economy reaches 1000w"),
+                    "${}>=100000000": new Achievement("Billionaire", "Economy reaches 10000w")
+                }, regx: {}
+            },
+        }
     };
 
     static EventImplList = ["defaultImpl", "scoreMoneyImpl"];
@@ -2767,7 +2938,13 @@ class ConsumeTotem {
                     "useTotem": new Achievement("大难不死，必有后福", "在濒临死亡时使用图腾")
                 }
             }
-        }, en_US: {}
+        }, en_US: {
+            [SpecialType.TYPE]: {
+                name: "Special Achievement", details: {
+                    "useTotem": new Achievement("If you don't die, you will have good luck", "Use a totem when you are dying")
+                }
+            }
+        }
     };
 
     static EventImplList = ["defaultImpl"];
@@ -2837,7 +3014,43 @@ class InventoryChange {
                     "minecraft:map": new Achievement("缺德地图,竭诚为您导航", "首次获得地图"),
                 }, regx: {}
             }
-        }, en_US: {}
+        }, en_US: {
+            itemObtain: {
+                enable: true, name: "Item Achievement", details: {
+                    "minecraft:furnace": new Achievement("Chat is hot!", "Get the furnace for the first time"),
+                    "minecraft:crafting_table": new Achievement("It's time to work!", "Get a crafting table for the first time"),
+                    "minecraft:torch": new Achievement("Light the way forward!", "Get the torch for the first time"),
+                    "minecraft:campfire": new Achievement("It's time for the campfire!", "Get the first campfire"),
+                    "minecraft:bread": new Achievement("Do you remember how many slices of bread you have eaten so far?", "First time getting bread"),
+                    "minecraft:cake": new Achievement("Cake is a lie", "First time getting cake"),
+                    "minecraft:wooden_sword": new Achievement("It's time for fencing!", "Get a wooden sword for the first time"),
+                    "minecraft:stone_sword": new Achievement("Stone Spear and Hide", "First time obtaining a stone sword"),
+                    "minecraft:iron_sword": new Achievement("Forging and Tempering", "First time getting an iron sword"),
+                    "minecraft:diamond_sword": new Achievement("Go to the next level", "Get the diamond sword for the first time"),
+                    "minecraft:netherite_sword": new Achievement("All fear comes from lack of firepower", "First time getting an alloy sword"),
+                    "minecraft:apple": new Achievement("A bitten apple", "First time getting an apple"),
+                    "minecraft:wooden_pickaxe": new Achievement("Little miner, come to report", "Get a wooden pickaxe for the first time"),
+                    "minecraft:stone_pickaxe": new Achievement("Mining time is up", "First time getting a stone pickaxe"),
+                    "minecraft:iron_pickaxe": new Achievement("Advanced Miner", "First time getting an iron pickaxe"),
+                    "minecraft:golden_pickaxe": new Achievement("Gold Miner", "First Golden Pickaxe"),
+                    "minecraft:diamond_pickaxe": new Achievement("Getting better", "First time getting a diamond pickaxe"),
+                    "minecraft:netherite_pickaxe": new Achievement("Unbreakable", "First time getting an alloy pickaxe"),
+                    "minecraft:wooden_hoe": new Achievement("On the afternoon of the day of hoeing, sweat dripped down the soil", "Get a wooden hoe for the first time"),
+                    "minecraft:golden_hoe": new Achievement("When I become emperor, I must use a golden hoe to hoe the ground", "Get a golden hoe for the first time"),
+                    "minecraft:golden_shovel": new Achievement("Golden Shovel Battle", "First Golden Shovel Obtained"),
+                    "minecraft:wooden_axe": new Achievement("Small wooden axe, unfortunately not the God of Creation", "Get a wooden axe for the first time"),
+                    "minecraft:iron_axe": new Achievement("Berserker", "First time getting an iron axe"),
+                    "minecraft:netherite_axe": new Achievement("First time getting an alloy axe"),
+                    "minecraft:bow": new Achievement("Introduction to Bows and Arrows", "Getting Bows and Arrows for the First Time"),
+                    "minecraft:shield": new Achievement("Hide behind", "Get a shield for the first time"),
+                    "minecraft:golden_apple": new Achievement("King the world", "Get the golden apple for the first time"),
+                    "minecraft:enchanted_golden_apple": new Achievement("How lonely it is to be invincible", "Get an enchanted golden apple for the first time"),
+                    "minecraft:clock": new Achievement("Enter the server and die", "Own the clock for the first time"),
+                    "minecraft:fishing_rod": new Achievement("The Lonely Boat Minor, Fishing for Snow in the Cold River", "Getting a Fishing Rod for the First Time"),
+                    "minecraft:map": new Achievement("Virtuous map, dedicated to help you navigate", "Get the map for the first time"),
+                }, regx: {}
+            }
+        }
     };
 
     static EventImplList = ["defaultImpl", "eatImpl"];
@@ -2913,7 +3126,15 @@ class UseBucketTake {
                     "lava": "lava"
                 }
             }
-        }, en_US: {}
+        }, en_US: {
+            [SpecialType.TYPE]: {
+                name: "Special Achievement", details: {
+                    "lava": new Achievement("Drink to warm yourself up", "Spoon a bucket of lava")
+                }, regx: {
+                    "lava": "lava"
+                }
+            }
+        }
     };
 
     static EventImplList = ["defaultImpl",];
@@ -2954,7 +3175,11 @@ class DropItem {
             [SpecialType.TYPE]: {
                 name: "特殊成就", details: {}
             }
-        }, en_US: {}
+        }, en_US: {
+            [SpecialType.TYPE]: {
+                name: "Special Achievement", details: {}
+            }
+        }
     };
 
     static EventImplList = ["defaultImpl",];
@@ -3000,7 +3225,18 @@ class Eat {
                     "minecraft:cooked_chicken": new Achievement("数一数二的烧鸡!", "吃掉一个烧鸡"),
                 }
             }
-        }, en_US: {}
+        }, en_US: {
+            eat: {
+                enable: true, name: "Food Achievement", details: {
+                    "minecraft:pufferfish": new Achievement("Sour!", "Eat a pufferfish"),
+                    "minecraft:cookie": new Achievement("Whether to accept all cookie settings from this website", "Eat a cookie"),
+                    "minecraft:dried_kelp": new Achievement("The taste of the sea, I know", "Eat a kelp"),
+                    "minecraft:rotten_flesh": new Achievement("Barely hungry", "Eat a zombie rotten flesh"),
+                    "minecraft:apple": new Achievement("An apple a day keeps the doctor away", "Eat an apple"),
+                    "minecraft:cooked_chicken": new Achievement("One of the best roast chickens!", "Eat a roast chicken"),
+                }
+            }
+        }
     };
 
     static EventImplList = ["defaultImpl"];
@@ -3060,7 +3296,15 @@ class ArmorSet {
                     "netheriteAll": new Achievement("武装到牙齿", "装备一套合金盔甲")
                 }
             }
-        }, en_US: {}
+        }, en_US: {
+            armor: {
+                enable: true, name: "Equipment Achievement", details: {
+                    "setAll": new Achievement("Full Armor", "Equip a set of any armor"),
+                    "preFly": new Achievement("Wuhu take off!", "Elypse equipped"),
+                    "netheriteAll": new Achievement("Armed to the teeth", "Equip a set of alloy armor")
+                }
+            }
+        }
     };
 
     static EventImplList = ["defaultImpl", "elytraImpl", "netheriteImpl"];
@@ -3157,7 +3401,17 @@ class BedEnter {
                     "snowDream": new Achievement("冰雪之梦", "在雪中睡一晚上")
                 }, regx: {}
             }
-        }, en_US: {}
+        }, en_US: {
+            sleep: {
+                enable: true, name: "Sleep Achievement", details: {
+                    "cloudDream": new Achievement("Cloud Dream", "Sleep a night above the clouds"),
+                    "undergroundDream": new Achievement("Breath of the Abyss", "Sleep one night on the cave floor"),
+                    "normalDream": new Achievement("Full of energy", "Sleep safely at night"),
+                    "rainDream": new Achievement("The house leaks when it rains overnight", "Sleep in the rain for one night"),
+                    "snowDream": new Achievement("Snow Dream", "Sleep in the snow for a night")
+                }, regx: {}
+            }
+        }
     };
 
     static EventImplList = ["defaultImpl",];
@@ -3260,7 +3514,17 @@ class ProjectileHitEntity {
                     "${}>=100": new Achievement("精准制导", "用箭命中距离100以外的生物")
                 }, regx: {}
             }
-        }, en_US: {}
+        }, en_US: {
+            shootDistance: {
+                enable: true, name: "Shooting Achievement", details: {
+                    "${}>=20": new Achievement("Ten meters away", "Hit a creature beyond 20 with an arrow"),
+                    "${}>=40": new Achievement("No missing arrows", "Hit creatures beyond 40 with arrows"),
+                    "${}>=60": new Achievement("Marksman", "Hit a creature beyond 60 with an arrow"),
+                    "${}>=80": new Achievement("One Hundred Steps Through Yang", "Hit creatures beyond 80 with arrows"),
+                    "${}>=100": new Achievement("Precision Guidance", "Hit creatures beyond 100 with arrows")
+                }, regx: {}
+            }
+        }
     };
 
     static EventImplList = ["shootDistanceImpl", "fireBallGhastImpl"];
@@ -3347,65 +3611,6 @@ class ProjectileCreated {
     }
 }
 
-
-class PlayerCmd {
-
-    /**
-     * 玩家执行命令
-     * @type {string}
-     */
-    static EVENT = "onPlayerCmd";
-
-    static ENTRY = {
-        zh_CN: {
-            [SpecialType.TYPE]: {
-                name: "特殊成就", details: {}
-            }
-        }, en_US: {}
-    };
-
-    static EventImplList = [];
-
-    static process(pl, cmd) {
-        if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (EventProcessor.antiEventShake(pl, PlayerCmd.EVENT)) return;
-        LogUtils.debug(`参数列表:`, ...arguments);
-        LogUtils.debug(`事件:${PlayerCmd.EVENT} 名称:玩家使用命令 玩家:${pl.name} 命令:${cmd}`);
-        EventProcessor.eventImplsProcess(PlayerCmd, [pl, cmd], PlayerCmd.EventImplList).catch(err => {
-            LogUtils.error(`${PlayerCmd.EVENT}: `, err);
-        });
-    }
-}
-
-class PlayerChat {
-
-    /**
-     * 玩家聊天
-     * @type {string}
-     */
-    static EVENT = "onChat";
-
-    static ENTRY = {
-        zh_CN: {
-            chat: {
-                name: "聊天成就", details: {}
-            }
-        }, en_US: {}
-    };
-
-    static EventImplList = [];
-
-    static process(pl, msg) {
-        if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (EventProcessor.antiEventShake(pl, PlayerChat.EVENT)) return;
-        LogUtils.debug(`参数列表:`, ...arguments);
-        LogUtils.debug(`事件:${PlayerChat.EVENT} 名称:玩家发送聊天消息 玩家:${pl.name} 信息:${msg}`);
-        EventProcessor.eventImplsProcess(PlayerCmd, [pl, msg], PlayerChat.EventImplList).catch(err => {
-            LogUtils.error(`${PlayerChat.EVENT}: `, err);
-        });
-    }
-}
-
 /**
  * 玩家完成成就后触发的成就
  */
@@ -3420,6 +3625,17 @@ class AfterFinished {
                     "${}>=80": new Achievement("游戏人生", "达成80个成就"),
                     "${}>=100": new Achievement("忠实粉丝", "达成100个成就"),
                     "${}>=150": new Achievement("骨灰玩家", "达成150个成就"),
+                }, regx: {}
+            }
+        },
+        en_US: {
+            "achiCount": {
+                enable: true, name: "Number of achievements", details: {
+                    "${}>=10": new Achievement("Little famous", "Achieved 10 achievements"),
+                    "${}>=50": new Achievement("Familiarity", "Achieve 50 achievements"),
+                    "${}>=80": new Achievement("Game of Life", "Achieve 80 achievements"),
+                    "${}>=100": new Achievement("Loyal Fans", "Achieve 100 Achievements"),
+                    "${}>=150": new Achievement("Ashes Player", "Achieve 150 Achievements"),
                 }, regx: {}
             }
         }
@@ -3452,16 +3668,10 @@ class AfterFinished {
 class EventProcessor {
 
     /**
-     * 一些成就没有特殊的触发器，即使用INDEX来代替
-     * @type {string}
-     */
-    static INDEX = "index";
-
-    /**
      * 记录了所有的事件处理class
      * @type {Array}
      */
-    static EVENT_PROCESSOR_LIST = [Join, Left, ChangeDim, Destroy, Place, AttackEntity, MobHurt, MobDie, PlDie, ScoreChange, ConsumeTotem, InventoryChange, UseBucketTake, DropItem, Eat, ArmorSet, BedEnter, ProjectileHitEntity, ProjectileCreated, PlayerChat, PlayerCmd, AfterFinished];
+    static EVENT_PROCESSOR_LIST = [Join, Left, ChangeDim, Destroy, Place, AttackEntity, MobHurt, MobDie, PlDie, ScoreChange, ConsumeTotem, InventoryChange, UseBucketTake, DropItem, Eat, ArmorSet, BedEnter, ProjectileHitEntity, ProjectileCreated, AfterFinished];
 
     /**
      * pl - 玩家对象
@@ -3564,3 +3774,25 @@ LogUtils.info(Banner);
 LogUtils.info(PLUGINS_INFO.version);
 LogUtils.info("MineBBS: https://www.minebbs.com/resources/3434/");
 LogUtils.info("Github: https://github.com/246859/Achievement");
+
+//命名空间
+const namespace = "Achievement";
+
+//玩家数据操作导出
+ll.export(PlDataManager.getPlAchiInfo, namespace, "getPlAchiInfo");//获取一个玩家的成就信息
+ll.export(PlDataManager.addPlAchiInfo, namespace, "addPlAchiInfo");//增加一个玩家的成就信息
+ll.export(PlDataManager.setPlAchiInfo, namespace, "setPlAchiInfo");//设置一个玩家的成就信息
+
+//语言数据操作导出
+ll.export(LangManager.getAchievementEntry, namespace, "getAchievementEntry");//获取一个成就词条的信息
+ll.export(LangManager.getAchievementEntryType, namespace, "getAchievementEntryType");//获取一个成就类型的信息
+ll.export(LangManager.getAchievementTriggerName, namespace, "getAchievementTriggerName");//获取一个原始触发值对应的真实触发值
+ll.export(LangManager.getAchievementStatistic, namespace, "getAchievementStatistic");//获取成就词条的统计信息
+ll.export(LangManager.getLangEntry, namespace, "getLangEntry");//获取运行时所有的成就词条信息
+
+//成就处理导出
+ll.export(StringEqual.stringEqualImpl, namespace, "stringEqualImpl");//字符串成就处理
+ll.export(NumberChange.numberChangeImpl, namespace, "numberChangeImpl");//数字成就处理
+ll.export(SpecialType.specialImpl, namespace, "specialImpl");//特殊成就处理
+ll.export(EventProcessor.eventImplsProcess, namespace, "eventImplsProcess");//成就事件处理
+
