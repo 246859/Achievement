@@ -1868,20 +1868,25 @@ class AchievementManager {
      * @param status
      */
     static updateAchievement(pl, type, key, status) {
+        let originalPlData = {};
+        Utils.checkDifferences(PlDataManager.getPlAchiInfo(pl.xuid), originalPlData, false);//将修改前的玩家原始数据深拷贝
         try {
             if (status) {
+                //如果为true，判定为完成成就，则记录玩家达成成就的时间，坐标，
                 PlDataManager.setPlAchiKey(pl.xuid, type, key, new PlayerAchievement(status, new Date().toLocaleString(), pl.pos));
                 PlDataManager.getPlAchiInfo(pl.xuid).finished++;
             } else {
+                //为false，则判定为删除成就，将对应的数据置为undefined
                 PlDataManager.setPlAchiKey(pl.xuid, type, key, undefined);
                 PlDataManager.getPlAchiInfo(pl.xuid).finished--;
             }
         } catch (err) {
-            LogUtils.debug("修改玩家成就装状态失败: ", err);
+            LogUtils.error("修改玩家成就装状态失败: ", err);
+            PlDataManager.setPlAchiInfo(pl.xuid, originalPlData);//发生异常后，将修改前的原始数据写入玩家数据中
             return false;
         }
         //修改过玩家成就状态后，重新写入缓存。
-        RuntimeCache.setCache(PlDataManager.getCacheKey(pl, type, key), PlDataManager.getCacheKey(pl.xuid, type, key));
+        RuntimeCache.setCache(PlDataManager.getCacheKey(pl, type, key), status);
         LogUtils.debug("修改玩家成就状态成功");
         return true;
     }
@@ -1890,32 +1895,17 @@ class AchievementManager {
      * 获取一个玩家的成就状态
      */
     static judgeAchievement(pl, type, key) {
+        //获取缓存键值
         const cacheKey = PlDataManager.getCacheKey(pl, type, key);
-        //如果有缓存就直接返回缓存
+        //如果击中缓存就直接返回缓存
         if (RuntimeCache.has(cacheKey)) return RuntimeCache.getCache(cacheKey);
-        PlDataManager.initPlayerInfo(pl, type);
+        //玩家不存在就初始化玩家数据
+        if (!PlDataManager.hasPlayerInfo(pl.xuid)) PlDataManager.initPlayerInfo(pl, type);
+        //读取玩家数据判断是否完成成就
         let isFinished = Boolean(PlDataManager.getPlAchiKey(pl.xuid, type, key));
         //读取到玩家成就状态时，将其存入缓存
         RuntimeCache.setCache(cacheKey, isFinished);
         return isFinished;
-    }
-
-    /**
-     * 修改指定玩家的指定成就的状态
-     */
-    static modifyAchievement(pl, type, key, status) {
-        PlDataManager.initPlayerInfo(pl, type);
-        let originalPlayerInfo = PlDataManager.getPlAchiInfo(pl.xuid);
-        //status 为true是新增,false是删除
-        if (status) {
-            PlDataManager.setPlAchiKey(pl.xuid, type, key, new PlayerAchievement(status, new Date().toLocaleString(), pl.pos));
-            PlDataManager.getPlAchiInfo(pl.xuid).finished++;
-        } else {
-            PlDataManager.setPlAchiKey(pl.xuid, type, key, undefined);
-            PlDataManager.getPlAchiInfo(pl.xuid).finished--;
-        }
-        //修改过玩家成就状态后，重新写入缓存。
-        RuntimeCache.setCache(PlDataManager.getCacheKey(pl, type, key), PlDataManager.getCacheKey(pl.xuid, type, key));
     }
 
     /**
@@ -1938,7 +1928,7 @@ class AchievementManager {
         if (this.isFinishedAchievement(pl, type, trigger)) return Promise.reject();
         //修改玩家成就状态
         if (!this.updateAchievement(pl, type, trigger, true)) return Promise.reject();
-        LogUtils.debug("-----成就处理完成,准备异步后处理-----");
+        LogUtils.debug("-----成就处理通过,判定为完成成就,准备异步后处理-----");
         //成就完成后处理
         return this.postProcess(pl, entry);
     }
@@ -1950,6 +1940,7 @@ class AchievementManager {
      */
     static processAsync(awaitRes) {
         return Utils.isNullOrUndefined(awaitRes) ? Promise.reject() : AchievementManager.process(awaitRes).catch(err => {
+            LogUtils.debug("-----成就处理不通过,过程中有条件不符合-----")
             throw err;
         });
     }
@@ -1996,7 +1987,7 @@ class AchievementManager {
  * }
  * achi_type_name即成就类型名，displayName即对于用户而言展示的名称，details即该成就类型所对应的词条细节
  * key值可以理解为一个成就词条的触发器，而每一个成就词条都必须是一个Achievement对象，包含msg-成就信息，condition-达成条件
- * 2.每一个事件处理类的成就词条key值可以与其他事件重复，即代表这两个事件是同一种类型的成就
+ * 2.每一个事件处理类的成就achi_type_name值可以与其他事件重复，即代表这两个事件是同一种类型的成就
  * 3.如果一个事件处理类中没有ENTRY属性，则在词条收集工作进行时将不会包含该事件，这类事件通常是用作辅助数据处理，并不需要对应的成就词条。
  */
 
@@ -2630,7 +2621,7 @@ class MobDie {
         return StringEqual.defaultImpl(pl, type, key, key);
     }
 
-    static ghastDieImpl(mob, source, cause) {
+    static async ghastDieImpl(mob, source, cause) {
         //死亡生物是恶魂，且被弹射物击杀，而且拥有与玩家绑定的UID 则判定为符合条件
         if (mob.type !== "minecraft:ghast" || source.type !== "minecraft:player" || cause !== 3) return Promise.reject();
         let pl;
@@ -2680,7 +2671,7 @@ class MobHurt {
      * @param damage
      * @returns {Promise<never>}
      */
-    static defaultImpl(mob, source, damage) {
+    static async defaultImpl(mob, source, damage) {
         let pl;
         let key;
         if (Utils.isNullOrUndefined((pl = Utils.toPlayer(source)))) return Promise.reject();
@@ -2800,7 +2791,7 @@ class ConsumeTotem {
         });
     }
 
-    static defaultImpl(pl) {
+    static async defaultImpl(pl) {
         const key = "useTotem";
         return SpecialType.defaultImpl(pl, key, false, false);
     }
@@ -2949,7 +2940,7 @@ class UseBucketTake {
     }
 
 
-    static defaultImpl(pl, item, target) {
+    static async defaultImpl(pl, item, target) {
         const key = target.type;
         return SpecialType.defaultImpl(pl, key, false, false);
     }
@@ -2988,7 +2979,7 @@ class DropItem {
         });
     }
 
-    static defaultImpl(pl, item) {
+    static async defaultImpl(pl, item) {
         const key = item.type;
         return SpecialType.defaultImpl(pl, key, false, false);
     }
