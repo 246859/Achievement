@@ -25,13 +25,13 @@ const DEFAULT_CONFIG = {
     display: {//成就完成后的展示
         scope: 2,//作用范围 2所有人都能看到，1仅个人能看到，0不展示
         toast: {//成就弹窗
-            enable: true
+            enable: true, toastTitle: "§l§a${title}", toastMsg: "§3${msg}"
         }, beep: {//提示音
             enable: true, type: "random.toast",//提示音类型
             volume: 5, //音量
             pitchArray: [0.3, 1, 1.5]//音调数组
         }, chatBar: {//聊天栏展示
-            enable: true
+            enable: true, chatBarMsg: "§l§6[ACHIEVEMENT]§r §e玩家 ${name} §c获得成就 §a${entry}§3 ———— ${condition}"
         }
     }, reward: {//成就完成奖励
         economy: {//经济奖励
@@ -59,15 +59,9 @@ const DEFAULT_CONFIG = {
  */
 const LANG = {
     zh_CN: {
-        Entry: {}, Menu: {
-            display: {
-                toastTitle: "§l§a${title}",
-                toastMsg: "§3${msg}",
-                chatBar: "§l§6[ACHIEVEMENT]§r §e玩家 ${name} §c获得成就 §a${entry}§3 ———— ${condition}"
-            }
-        }
+        Entry: {}
     }, en_US: {
-        Entry: {}, Menu: {}
+        Entry: {}
     }
 };
 
@@ -77,10 +71,7 @@ const LANG = {
  */
 
 const Constant = {
-    version: "achi_version",
-    typeCount: "typeCount",
-    totalCount: "totalCount",
-    moneyType: {
+    version: "achi_version", typeCount: "typeCount", totalCount: "totalCount", moneyType: {
         score: "score", llmoney: "llmoney"
     }, langType: {
         zh_CN: "zh_CN", en_US: "en_US"
@@ -123,7 +114,10 @@ const Constant = {
                 initEntryCount: "成就插件成功加载,总计${}种成就类型,${}个成就词条,${}个事件监听",
                 backUp: "检测到插件版本与本地缓存版本不一致，即将开始备份，随后将更新本地文件",
                 backUpSuccess: "备份成功保存在路径:",
-                initError: "插件启动异常: "
+                initError: "插件启动异常: ",
+                invalidType: "无效的成就类型: ",
+                langDir: "当前语言加载目录为: ",
+                langFile: "成功加载语言文件:　",
             }, IO: {
                 readJsonNull: "路径: ${path} JSON读取为: ${buffer}",
                 readJsonError: "路径: ${path} JSON读取异常: ",
@@ -180,8 +174,7 @@ const Runtime = {
     entryTypeTotalCounts: 0,//当前版本成就类型总数
     entryTotalCounts: 0,//当前版本成就词条总数
     config: {debug: true, language: ZH_CN},//配置对象
-    entry: undefined,//词条对象
-    menu: undefined,//菜单对象
+    entry: {},//词条对象
     rewardManager: undefined,//奖励对象
     displayManger: undefined,//展示对象
 };
@@ -818,7 +811,6 @@ class LangManager {
         //将所有事件的词条收集到entry中
         EventProcessor.EVENT_PROCESSOR_LIST.forEach(processor => {
             if (!processor.ENTRY) return;
-            LogUtils.debug(processor.EVENT);
             Utils.checkDifferences(processor.ENTRY, entry, false);
         });
 
@@ -830,10 +822,11 @@ class LangManager {
      * @param entry
      */
     static statisticEntry(entry) {
-        let lang_zh = entry[Constant.langType.zh_CN];
-        Runtime.entryTypeTotalCounts = Object.keys(lang_zh).length;
-        for (let type in lang_zh) {
-            Runtime.entryTotalCounts += Object.keys(lang_zh[type].details).length;
+        Runtime.entryTypeTotalCounts = Object.keys(entry).length;
+        for (let type in entry) {
+            let details = entry[type].details;
+            if (details) Runtime.entryTotalCounts += Object.keys(entry[type].details).length;
+            else LogUtils.error(Runtime.SystemInfo.init.invalidType, type);
         }
     }
 
@@ -938,7 +931,6 @@ class LangManager {
      */
     static collectLangEntry(langGroup) {
         let entry = this.collectEntry();
-        this.statisticEntry(entry);
         for (let langKey in langGroup) {
             langGroup[langKey].Entry = entry[langKey];
         }
@@ -1032,19 +1024,20 @@ class LangManager {
      * 根据配置的语言选项加载语言文件
      * @param langType
      * @param langGroup
-     * @returns {Promise<Awaited<*>[]>}
+     * @returns {Promise<boolean>}
      */
-    static loadLangFile(langType, langGroup) {
-        //如果是非内置的语言需要额外初始化一下
-        if (!langGroup[langType]) {
-            langGroup[langType] = {};
-            for (let key in langGroup[ZH_CN]) {
-                langGroup[langType][key] = {};
-            }
+    static async loadLangFile(langType, langGroup) {
+        let dir = this.getLangTypeDir(langType) + Path.FILE_SP;
+        let langFiles = File.getFilesList(dir);
+        LogUtils.debug(Runtime.SystemInfo.init.langDir, dir);
+        for (const file of langFiles) {
+            if (!file.includes(Path.JSON_SUFFIX)) continue;
+            let filePath = dir + file;
+            let langData = IO.readJsonFile(filePath);
+            Utils.checkDifferences(langData, Runtime.entry, false);
+            LogUtils.debug(Runtime.SystemInfo.init.langFile, file);
         }
-        return this.langFileIterator(langGroup, langType, (path, fileName) => {
-            Runtime[fileName.toLocaleLowerCase()] = IO.readJsonFile(path);
-        });
+        return true;
     }
 
 }
@@ -1301,6 +1294,8 @@ class Configuration {
         PersistentCache.set(Constant.typeCount, Runtime.entryTypeTotalCounts);
         //将词条类型数量写入缓存中
         PersistentCache.set(Constant.totalCount, Runtime.entryTotalCounts);
+        //统计词条数量
+        LangManager.statisticEntry(Runtime.entry);
     }
 
     /**
@@ -1618,7 +1613,7 @@ class DisplayManager {
      */
     async chatBarDisplay(pl, entry) {
         if (!this.chatBar.enable) return;
-        let finalMsg = Utils.loadTemplate(Runtime.menu.display.chatBar, pl.name, entry.msg, entry.condition);
+        let finalMsg = Utils.loadTemplate(this.chatBar.chatBarMsg, pl.name, entry.msg, entry.condition);
         LogUtils.debug(Utils.loadTemplate(Runtime.SystemInfo.display.chatBar, this.scope, pl.name, finalMsg));
         switch (this.scope) {
             case this.SCOPE.PUBLIC_SCOPE : {
@@ -1641,7 +1636,7 @@ class DisplayManager {
     async toastDisplay(pl, entry) {
         if (!this.toast.enable) return;
         LogUtils.debug(Utils.loadTemplate(Runtime.SystemInfo.display.toast, pl.name, entry.msg, entry.condition));
-        return pl.sendToast(Utils.loadTemplate(Runtime.menu.display.toastTitle, entry.msg), Utils.loadTemplate(Runtime.menu.display.toastMsg, entry.condition));
+        return pl.sendToast(Utils.loadTemplate(this.toast.toastTitle, entry.msg), Utils.loadTemplate(this.toast.toastMsg, entry.condition));
     }
 
     /**
@@ -1940,7 +1935,7 @@ class AchievementManager {
      */
     static processAsync(awaitRes) {
         return Utils.isNullOrUndefined(awaitRes) ? Promise.reject() : AchievementManager.process(awaitRes).catch(err => {
-            LogUtils.debug("-----成就处理不通过,过程中有条件不符合-----")
+            LogUtils.debug("-----成就处理不通过,过程中有条件不符合-----");
             throw err;
         });
     }
