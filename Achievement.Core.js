@@ -2213,7 +2213,7 @@ class Join {
     static ENTRY = {
         zh_CN: {
             [SpecialType.TYPE]: {
-                enable: true, name: "特殊成就", details: {
+                enable: true, name: "特殊成就", ui:"textures/ui/enable_editor",  details: {
                     join: new Achievement("Hello World!", "首次进入服务器"),
                 }, regx: {}
             }
@@ -2298,7 +2298,7 @@ class ChangeDim {
     static ENTRY = {
         zh_CN: {
             changeDim: {
-                enable: true, name: "维度成就", details: {
+                enable: true, name: "维度成就",ui:"textures/ui/realmPortalSmall", details: {
                     "0": new Achievement("真是美好的世界", "返回主世界"),
                     "1": new Achievement("地狱空空荡荡，魔鬼都在人间", "到达地狱"),
                     "2": new Achievement("永恒、无星暗夜的维度", "到达末地")
@@ -2348,7 +2348,7 @@ class Destroy {
     static ENTRY = {
         zh_CN: {
             destroyBlock: {
-                enable: true, name: "挖掘成就", details: {
+                enable: true, name: "挖掘成就",ui:"textures/ui/icon_iron_pickaxe", details: {
                     "minecraft:log": new Achievement("要致富，先撸树!", "首次砍掉原木"),
                     "minecraft:stone": new Achievement("疯狂的石头!", "首次挖掘石头"),
                     "minecraft:coal_ore": new Achievement("满面尘灰烟火色，两鬓苍苍十指黑", "首次挖掘煤矿"),
@@ -2501,7 +2501,7 @@ class PlDie {
     static ENTRY = {
         zh_CN: {
             death: {
-                enable: true, name: "死亡成就", details: {
+                enable: true, name: "死亡成就", ui:"textures/ui/friend_glyph_desaturated",details: {
                     "minecraft:creeper": new Achievement("突如其来的惊喜!", "死于苦力怕"),
                     "minecraft:zombie": new Achievement("倒在了尸潮中", "死于僵尸"),
                     "minecraft:skeleton": new Achievement("中门对狙", "死于小白"),
@@ -2649,7 +2649,7 @@ class MobDie {
     static ENTRY = {
         zh_CN: {
             killer: {
-                enable: true, name: "击杀成就", details: {
+                enable: true, name: "击杀成就",ui:"textures/ui/promo_creeper", details: {
                     "minecraft:creeper": new Achievement("嘶~嘶~", "首次击杀苦力怕"),
                     "minecraft:zombie": new Achievement("僵尸围城", "首次击杀僵尸"),
                     "minecraft:skeleton": new Achievement("东风快递,使命必达", "首次击杀小白"),
@@ -2834,7 +2834,7 @@ class ScoreChange {
     static ENTRY = {
         zh_CN: {
             "ScoreMoney": {
-                enable: true, name: "经济成就", details: {
+                enable: true, name: "经济成就",ui:"textures/ui/icon_minecoin_9x9", details: {
                     "${}<=0": new Achievement("大负翁", "经济达到0"),
                     "${}>=1000": new Achievement("低保生活", "经济达到1k"),
                     "${}>=10000": new Achievement("卑微社畜", "经济达到1w"),
@@ -2969,7 +2969,7 @@ class InventoryChange {
     static ENTRY = {
         zh_CN: {
             itemObtain: {
-                enable: true, name: "物品成就", details: {
+                enable: true, name: "物品成就",ui:"textures/ui/promo_gift_small_yellow", details: {
                     "minecraft:furnace": new Achievement("聊的火热!", "首次获得熔炉"),
                     "minecraft:crafting_table": new Achievement("工作时间到！", "首次获得工作台"),
                     "minecraft:torch": new Achievement("照亮前进的道路!", "首次获得火把"),
@@ -3205,7 +3205,7 @@ class Eat {
     static ENTRY = {
         zh_CN: {
             eat: {
-                enable: true, name: "食物成就", details: {
+                enable: true, name: "食物成就", ui:"textures/ui/icon_cookie", details: {
                     "minecraft:pufferfish": new Achievement("酸爽!", "吃掉一个河豚"),
                     "minecraft:cookie": new Achievement("是否接受该网站所有cookie设置", "吃掉一个饼干"),
                     "minecraft:dried_kelp": new Achievement("海的味道，我知道", "吃掉一个波力海苔"),
@@ -3279,7 +3279,7 @@ class ArmorSet {
     static ENTRY = {
         zh_CN: {
             armor: {
-                enable: true, name: "装备成就", details: {
+                enable: true, name: "装备成就",ui:"textures/ui/icon_armor", details: {
                     "setAll": new Achievement("全副武装", "装备一套任意盔甲"),
                     "preFly": new Achievement("芜湖起飞!", "装备鞘翅"),
                     "netheriteAll": new Achievement("武装到牙齿", "装备一套合金盔甲")
@@ -3382,7 +3382,7 @@ class BedEnter {
     static ENTRY = {
         zh_CN: {
             sleep: {
-                enable: true, name: "睡眠成就", details: {
+                enable: true, name: "睡眠成就",ui:"textures/ui/icon_recipe_item", details: {
                     "cloudDream": new Achievement("云端之梦", "在云层之上睡一晚上"),
                     "undergroundDream": new Achievement("深渊之息", "在洞穴层睡一晚上"),
                     "normalDream": new Achievement("精神饱满", "安全的睡一晚上"),
@@ -3495,7 +3495,7 @@ class ProjectileHitEntity {
     static ENTRY = {
         zh_CN: {
             shootDistance: {
-                enable: true, name: "射击成就", details: {
+                enable: true, name: "射击成就",ui:"textures/items/bow_pulling_2", details: {
                     "${}>=20": new Achievement("十米开外", "用箭命中距离20以外的生物"),
                     "${}>=40": new Achievement("箭无虚发", "用箭命中距离40以外的生物"),
                     "${}>=60": new Achievement("神射手", "用箭命中距离60以外的生物"),
@@ -3505,7 +3505,7 @@ class ProjectileHitEntity {
             }
         }, en_US: {
             shootDistance: {
-                enable: true, name: "Shooting Achievement", details: {
+                enable: true, name: "Shooting Achievement",ui:"textures/items/bow_pulling_2", details: {
                     "${}>=20": new Achievement("Ten meters away", "Hit a creature beyond 20 with an arrow"),
                     "${}>=40": new Achievement("No missing arrows", "Hit creatures beyond 40 with arrows"),
                     "${}>=60": new Achievement("Marksman", "Hit a creature beyond 60 with an arrow"),
@@ -3608,7 +3608,7 @@ class AfterFinished {
     static ENTRY = {
         zh_CN: {
             "achiCount": {
-                enable: true, name: "成就数量成就", details: {
+                enable: true, name: "成就数量成就",ui:"textures/ui/icon_multiplayer", details: {
                     "${}>=10": new Achievement("小有名气", "达成10个成就"),
                     "${}>=50": new Achievement("轻车熟路", "达成50个成就"),
                     "${}>=80": new Achievement("游戏人生", "达成80个成就"),
