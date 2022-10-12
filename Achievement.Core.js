@@ -835,6 +835,10 @@ class LangManager {
             if (details) Runtime.entryTotalCounts += Object.keys(entry[type].details).length;
             else LogUtils.error(Runtime.SystemInfo.init.invalidType, type);
         }
+        //将成就类型数量写入缓存中
+        PersistentCache.set(Constant.typeCount, Runtime.entryTypeTotalCounts);
+        //将词条类型数量写入缓存中
+        PersistentCache.set(Constant.totalCount, Runtime.entryTotalCounts);
     }
 
     /**
@@ -1303,10 +1307,6 @@ class Configuration {
     static postData() {
         //将版本信息写入缓存
         PersistentCache.set(Constant.version, PLUGINS_INFO.version);
-        //将成就类型数量写入缓存中
-        PersistentCache.set(Constant.typeCount, Runtime.entryTypeTotalCounts);
-        //将词条类型数量写入缓存中
-        PersistentCache.set(Constant.totalCount, Runtime.entryTotalCounts);
         //统计词条数量
         LangManager.statisticEntry(Runtime.entry);
     }
@@ -1907,8 +1907,8 @@ class AchievementManager {
         const cacheKey = PlDataManager.getCacheKey(pl, type, key);
         //如果击中缓存就直接返回缓存
         if (RuntimeCache.has(cacheKey)) return RuntimeCache.getCache(cacheKey);
-        //玩家不存在就初始化玩家数据
-        if (!PlDataManager.hasPlayerInfo(pl.xuid)) PlDataManager.initPlayerInfo(pl, type);
+        //成就类型不存在就初始化玩家数据
+        if (!PlDataManager.hasPlAchiType(pl.xuid, type)) PlDataManager.initPlayerInfo(pl, type);
         //读取玩家数据判断是否完成成就
         let isFinished = Boolean(PlDataManager.getPlAchiKey(pl.xuid, type, key));
         //读取到玩家成就状态时，将其存入缓存
@@ -2022,18 +2022,13 @@ class NumberChange {
      * @returns {Promise<never>|Promise<*[]>|Promise<{pl, type, key: string}>}
      */
     static defaultImpl(pl, type, num, multipart) {
-        LogUtils.debug("数字成就实现");
-        LogUtils.debug(1);
         //防抖
         if (EventProcessor.antiEventShake(pl, type)) return Promise.reject();
         //计分板防抖
-        LogUtils.debug(3);
         //获取词条类型
         let entryType = LangManager.getAchievementEntryType(type);
-        LogUtils.debug(4);
         //判断对应数字类型的成就是否存在或者是否启用
         if (!entryType || !entryType.enable) return Promise.reject();
-        LogUtils.debug(5);
         //最后进行数字逻辑处理
         return multipart ? NumberChange.multipartImpl(pl, type, num, entryType) : NumberChange.singleImpl(pl, type, num, entryType);
     }
@@ -2136,20 +2131,14 @@ class StringEqual {
      * @returns {{pl, type, key}}
      */
     static async defaultImpl(pl, type, key, tag) {
-        LogUtils.debug("字符串实现");
-        LogUtils.debug("1");
         //类型防抖
         if (EventProcessor.antiEventShake(pl, tag)) return Promise.reject();
-        LogUtils.debug("2");
         //如果击中缓存则说明该成就已经完成，不需要再去判断
         if (RuntimeCache.has(PlDataManager.getCacheKey(pl, type, key))) return Promise.reject();
-        LogUtils.debug("3");
         //获取词条类型
         let entryType = LangManager.getAchievementEntryType(type);
-        LogUtils.debug("4");
         //判断对应类型的成就是否存在或者是否启用
         if (!entryType || !entryType.enable) return Promise.reject();
-        LogUtils.debug("5");
         return {
             pl, type, key
         };
@@ -3750,7 +3739,7 @@ class EventProcessor {
  */
 class Application {
 
-    static main() {
+    static async main() {
         Configuration.init().then(() => {
             //注册事件
             EventProcessor.registerMcEvent();
@@ -3795,4 +3784,3 @@ ll.export(StringEqual.stringEqualImpl, namespace, "stringEqualImpl");//字符串
 ll.export(NumberChange.numberChangeImpl, namespace, "numberChangeImpl");//数字成就处理
 ll.export(SpecialType.specialImpl, namespace, "specialImpl");//特殊成就处理
 ll.export(EventProcessor.eventImplsProcess, namespace, "eventImplsProcess");//成就事件处理
-
