@@ -806,7 +806,7 @@ class LangManager {
      * @param langGroup
      */
     static collectLang(langGroup) {
-        this.collectLangEntry(langGroup);
+        LangManager.collectLangEntry(langGroup);
     }
 
     /**
@@ -847,7 +847,7 @@ class LangManager {
     static getAchievementStatistic() {
         return {
             entryCount: Runtime.entryTotalCounts,
-            typeCount: Runtime.entryTotalCounts
+            typeCount: Runtime.entryTypeTotalCounts
         };
     }
 
@@ -871,16 +871,33 @@ class LangManager {
     }
 
     /**
+     * 获取所有的词条列表
+     */
+    static getLangEntryTypeList() {
+        let entry = LangManager.getLangEntry();
+        let res = [];
+        for (let type in entry) {
+            if (!entry[type].enable) continue;
+            res.push({
+                type,
+                name: entry[type].name,
+                ui: entry[type].ui,
+            });
+        }
+        return res;
+    }
+
+    /**
      * 获取取一个词条的触发值，触发值为undefine即该词条不存在
      * @param type
      * @param key
      */
     static getAchievementTriggerName(type, key) {
         LogUtils.debug("开始词条匹配");
-        let eqRes = this.eqMatch(type, key);
+        let eqRes = LangManager.eqMatch(type, key);
         LogUtils.debug(`type: ${type} key: ${key} 等值匹配-> type: ${type} trigger: ${eqRes}`);
         if (!Utils.isNullOrUndefined(eqRes)) return eqRes;
-        let regRes = this.regxMatch(type, key);
+        let regRes = LangManager.regxMatch(type, key);
         LogUtils.debug("等值匹配未查询到对应词条，开始正则匹配");
         LogUtils.debug(`type: ${type} key: ${key} 正则匹配-> type: ${type} trigger: ${regRes}`);
         if (!Utils.isNullOrUndefined(regRes)) return regRes;
@@ -894,7 +911,7 @@ class LangManager {
      * @returns {*}
      */
     static eqMatch(type, key) {
-        if (this.getAchievementEntryType(type).details[key]) return key; else return undefined;
+        if (LangManager.getAchievementEntryType(type).details[key]) return key; else return undefined;
     }
 
     /**
@@ -903,7 +920,7 @@ class LangManager {
      * @param key
      */
     static regxMatch(type, key) {
-        let achi_type = this.getAchievementEntryType(type);
+        let achi_type = LangManager.getAchievementEntryType(type);
         let details = achi_type.details;
         let regxObj = achi_type.regx;
         //尝试从缓存中读取历史正则匹配结果
@@ -914,7 +931,7 @@ class LangManager {
                 let mapTrigger = regxObj[regKey];
                 //匹配成功后缓存中,下次直接从缓存中读取结果
                 PersistentCache.set(key, mapTrigger);
-                return this.eqMatch(type, mapTrigger);
+                return LangManager.eqMatch(type, mapTrigger);
             }
         }
         return undefined;
@@ -934,7 +951,7 @@ class LangManager {
      * 获取一个指定的成就词条
      */
     static getAchievementEntry(type, key) {
-        let achiType = this.getAchievementEntryType(type);
+        let achiType = LangManager.getAchievementEntryType(type);
         if (achiType) return achiType.details[key]; else return undefined;
     }
 
@@ -951,7 +968,7 @@ class LangManager {
      * @param langGroup
      */
     static collectLangEntry(langGroup) {
-        let entry = this.collectEntry();
+        let entry = LangManager.collectEntry();
         for (let langKey in langGroup) {
             langGroup[langKey].Entry = entry[langKey];
         }
@@ -963,7 +980,7 @@ class LangManager {
     }
 
     static getLangFilePath(langType, fileName) {
-        return `${this.getLangTypeDir(langType)}/${fileName}${Path.JSON_SUFFIX}`;
+        return `${LangManager.getLangTypeDir(langType)}/${fileName}${Path.JSON_SUFFIX}`;
     }
 
     /**
@@ -979,9 +996,9 @@ class LangManager {
      * @param langGroup
      */
     static langGroupIterator(langGroup, outerResolver, innerResolver) {
-        return this.langTypeIterator(langGroup, async (dir, langType, groupData, langGroup) => {
+        return LangManager.langTypeIterator(langGroup, async (dir, langType, groupData, langGroup) => {
             await outerResolver(dir, langType, groupData, langGroup);
-            return this.langFileIterator(langGroup, langType, (path, fileName, data, langType, langGroup) => {
+            return LangManager.langFileIterator(langGroup, langType, (path, fileName, data, langType, langGroup) => {
                 return innerResolver(path, fileName, data, langType, langGroup);
             }).catch(err => {
                 throw err;
@@ -996,7 +1013,7 @@ class LangManager {
      */
     static langTypeIterator(langGroup, langDirResolver) {
         return AsyncUtils.iteratorAsync(langGroup, (langType, groupData) => {
-            let dir = this.getLangTypeDir(langType);
+            let dir = LangManager.getLangTypeDir(langType);
             return langDirResolver(dir, langType, groupData, langGroup);
         });
     }
@@ -1009,7 +1026,7 @@ class LangManager {
      */
     static langFileIterator(langGroup, langType, langFileResolver) {
         return AsyncUtils.iteratorAsync(langGroup[langType], (fileName, data) => {
-            let path = this.getLangFilePath(langType, fileName);
+            let path = LangManager.getLangFilePath(langType, fileName);
             return langFileResolver(path, fileName, data, langType, langGroup);
         });
     }
@@ -1018,7 +1035,7 @@ class LangManager {
      *  并行创建语言文件
      */
     static initLangFile(langGroup) {
-        return this.langGroupIterator(langGroup, (dir) => {
+        return LangManager.langGroupIterator(langGroup, (dir) => {
             if (IO.isNotExists(dir)) File.mkdir(dir);
         }, (path, fileName, data) => {
             if (IO.isNotExists(path)) IO.writeJsonFile(path, data);
@@ -1031,7 +1048,7 @@ class LangManager {
      * @returns {Promise<Awaited<*>[]>}
      */
     static updateLangFile(langGroup) {
-        return this.langGroupIterator(langGroup, () => {
+        return LangManager.langGroupIterator(langGroup, () => {
         }, (path, fileName, data) => {
             return Configuration.checkUpdateAndSave(path, data, false);
         });
@@ -1044,7 +1061,7 @@ class LangManager {
      * @returns {Promise<boolean>}
      */
     static async loadLangFile(langType, langGroup) {
-        let dir = this.getLangTypeDir(langType) + Path.FILE_SP;
+        let dir = LangManager.getLangTypeDir(langType) + Path.FILE_SP;
         let langFiles = File.getFilesList(dir);
         LogUtils.debug(Runtime.SystemInfo.init.langDir, dir);
         for (const file of langFiles) {
@@ -1340,9 +1357,15 @@ class PlayerData {
      */
     finished;
 
-    constructor(xuid, name) {
+    /**
+     * 成就细节
+     */
+    details;
+
+    constructor(xuid) {
         this.xuid = xuid;
         this.finished = 0;
+        this.details = {};
     }
 
     static assign(source) {
@@ -1366,7 +1389,7 @@ class PlDataManager {
      * @returns {*}
      */
     static getPlData() {
-        return this.plData;
+        return PlDataManager.plData;
     }
 
     /**
@@ -1374,7 +1397,7 @@ class PlDataManager {
      * @param obj
      */
     static assign(obj) {
-        this.plData = obj;
+        PlDataManager.plData = obj;
     }
 
     /**
@@ -1383,7 +1406,7 @@ class PlDataManager {
      * @returns {undefined|*}
      */
     static getPlAchiInfo(xuid) {
-        if (!Utils.isNullOrUndefined(xuid)) return this.plData[xuid]; else return undefined;
+        if (!Utils.isNullOrUndefined(xuid)) return PlDataManager.getPlData()[xuid]; else return undefined;
     }
 
     /**
@@ -1394,7 +1417,7 @@ class PlDataManager {
      */
     static setPlAchiInfo(xuid, obj) {
         if (!Utils.isNullOrUndefined(xuid)) {
-            return this.getPlData()[xuid] = obj;
+            return PlDataManager.getPlData()[xuid] = obj;
         } else return false;
     }
 
@@ -1405,17 +1428,62 @@ class PlDataManager {
      * @returns {boolean}
      */
     static addPlAchiInfo(xuid) {
-        if (!this.hasPlayerInfo(xuid)) {
-            return this.setPlAchiInfo(xuid, new PlayerData(xuid));
+        if (!PlDataManager.hasPlayerInfo(xuid)) {
+            return PlDataManager.setPlAchiInfo(xuid, new PlayerData(xuid));
         }
         return false;
     }
 
     /**
+     * 获取一个玩家的统计信息
+     * {
+     *     玩家已完成成就数量
+     *     玩家未完成成就数量
+     *     已完成的成就列表
+     *     未完成的成就列表
+     * }
+     */
+    static getPlAchiInfoStatistic(xuid) {
+        if (!PlDataManager.hasPlayerInfo(xuid)) return undefined;
+        let finished = PlDataManager.getPlAchiInfo(xuid).finished;
+        let finishedList = PlDataManager.getPlAchiTypeList(xuid);
+        let allList = LangManager.getLangEntryTypeList();
+        let unFinishedList = allList.filter(item => !finishedList.some(ele => ele.type === item.type));
+        return {
+            finished,
+            unFinished: Runtime.entryTotalCounts - finished,
+            finishedList,
+            unFinishedList
+        };
+    }
+
+    /**
+     * 获取一个玩家的已成就列表
+     * @param xuid
+     * @returns {*[]|undefined}
+     */
+    static getPlAchiTypeList(xuid) {
+        if (!PlDataManager.hasPlayerInfo(xuid)) return undefined;
+        let details = PlDataManager.getPlAchiInfo(xuid).details;
+        let res = [];
+        for (let type in details) {
+            let entryType = LangManager.getAchievementEntryType(type);
+            if (!entryType.enable) continue;
+            res.push({
+                type,
+                name: entryType.name,
+                ui: entryType.ui
+            });
+        }
+        return res;
+    }
+
+
+    /**
      * 判断某个玩家数据是否存在
      */
     static hasPlayerInfo(xuid) {
-        return xuid && this.getPlAchiInfo(xuid);
+        return xuid && PlDataManager.getPlAchiInfo(xuid);
     }
 
     /**
@@ -1424,8 +1492,8 @@ class PlDataManager {
      * @param type
      */
     static getPlAchiType(xuid, type) {
-        if (!this.hasPlayerInfo(xuid)) return undefined;
-        return this.getPlAchiInfo(xuid)[type];
+        if (!PlDataManager.hasPlayerInfo(xuid)) return undefined;
+        return PlDataManager.getPlAchiInfo(xuid).details[type];
     }
 
     /**
@@ -1436,8 +1504,8 @@ class PlDataManager {
      * @returns {boolean}
      */
     static setPlAchiType(xuid, type, obj) {
-        if (!this.hasPlayerInfo(xuid)) return false;
-        return this.getPlAchiInfo(xuid)[type] = obj;
+        if (!PlDataManager.hasPlayerInfo(xuid)) return false;
+        return PlDataManager.getPlAchiInfo(xuid).details[type] = obj;
     }
 
     /**
@@ -1447,7 +1515,7 @@ class PlDataManager {
      * @returns {boolean|*}
      */
     static hasPlAchiType(xuid, type) {
-        return type && this.getPlAchiType(xuid, type);
+        return type && PlDataManager.getPlAchiType(xuid, type);
     }
 
     /**
@@ -1457,8 +1525,8 @@ class PlDataManager {
      * @param key
      */
     static getPlAchiKey(xuid, type, key) {
-        if (!this.hasPlAchiType(xuid, type)) return undefined;
-        return this.getPlAchiType(xuid, type)[key];
+        if (!PlDataManager.hasPlAchiType(xuid, type)) return undefined;
+        return PlDataManager.getPlAchiType(xuid, type)[key];
     }
 
     /**
@@ -1470,8 +1538,8 @@ class PlDataManager {
      * @returns {boolean|*}
      */
     static setPlAchiKey(xuid, type, key, obj) {
-        if (!this.hasPlAchiType(xuid, type)) return false;
-        return this.getPlAchiType(xuid, type)[key] = obj;
+        if (!PlDataManager.hasPlAchiType(xuid, type)) return false;
+        return PlDataManager.getPlAchiType(xuid, type)[key] = obj;
     }
 
     /**
@@ -1482,16 +1550,16 @@ class PlDataManager {
      * @returns {*}
      */
     static hasPlAchiKey(xuid, type, key) {
-        return key && this.getPlAchiKey(xuid, type, key);
+        return key && PlDataManager.getPlAchiKey(xuid, type, key);
     }
 
     static initPlayerInfo(pl, type) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
         let xuid = pl.xuid;
         //如果没有玩家信息就初始化玩家信息
-        if (!this.hasPlayerInfo(xuid)) this.addPlAchiInfo(xuid);
+        if (!PlDataManager.hasPlayerInfo(xuid)) PlDataManager.addPlAchiInfo(xuid);
         //如果该成就类型不存在就初始化该成就类型
-        if (!this.hasPlAchiType(xuid, type)) this.setPlAchiType(xuid, type, {});
+        if (!PlDataManager.hasPlAchiType(xuid, type)) PlDataManager.setPlAchiType(xuid, type, {});
     }
 
     /**
@@ -1499,7 +1567,7 @@ class PlDataManager {
      * @returns {Promise<unknown>}
      */
     static saveAsync() {
-        return IO.writeJsonFileAsync(Path.PLAYER_DATA_PATH, this.getPlData());
+        return IO.writeJsonFileAsync(Path.PLAYER_DATA_PATH, PlDataManager.getPlData());
     }
 
     static getCacheKey(pl, type, key) {
@@ -2443,7 +2511,7 @@ class Place {
     static ENTRY = {
         zh_CN: {
             place: {
-                enable: true, name: "放置成就", details: {
+                enable: true, name: "放置成就", ui: "textures/ui/icon_rail_normal", details: {
                     "minecraft:flower_pot": new Achievement("准备园艺", "放置一个花盆"),
                     "minecraft:sapling": new Achievement("环保工作", "种一颗树苗"),
                     "minecraft:sign": new Achievement("告诉大家伙!", "放置一个告示牌"),
@@ -3810,7 +3878,9 @@ class EventProcessor {
  */
 class Application {
 
-    static async main() {
+    static isLoaded = false;
+
+    static main() {
         Configuration.init().then(() => {
             //注册事件
             EventProcessor.registerMcEvent();
@@ -3818,10 +3888,18 @@ class Application {
             Configuration.postData();
             LogUtils.info(Utils.loadTemplate(Runtime.SystemInfo.init.currentLang, Runtime.config.language));
             LogUtils.info(Utils.loadTemplate(Runtime.SystemInfo.init.initEntryCount, Runtime.entryTypeTotalCounts, Runtime.entryTotalCounts, EventProcessor.EVENT_PROCESSOR_LIST.length));
-
+            this.isLoaded = true;
         }).catch(err => {
             LogUtils.error(Runtime.SystemInfo.init.initError, err);
         });
+    }
+
+    /**
+     * 插件核心是否加载完毕
+     * @returns {boolean}
+     */
+    static isAppLoaded() {
+        return Application.isLoaded;
     }
 }
 
@@ -3838,10 +3916,19 @@ LogUtils.info("Github: https://github.com/246859/Achievement");
 //命名空间
 const namespace = "Achievement";
 
+//插件是否加载完毕
+ll.export(Application.isAppLoaded, namespace, "isAppLoaded");
+
+//日志
+ll.export(LogUtils.debug, namespace, "debugLog");
+ll.export(LogUtils.info, namespace, "infoLog");
+ll.export(LogUtils.error, namespace, "errorLog");
+
 //玩家数据操作导出
 ll.export(PlDataManager.getPlAchiInfo, namespace, "getPlAchiInfo");//获取一个玩家的成就信息
-ll.export(PlDataManager.addPlAchiInfo, namespace, "addPlAchiInfo");//增加一个玩家的成就信息
-ll.export(PlDataManager.setPlAchiInfo, namespace, "setPlAchiInfo");//设置一个玩家的成就信息
+ll.export(PlDataManager.getPlAchiType, namespace, "getPlAchiType");//获取一个玩家成就类型的信息
+ll.export(PlDataManager.getPlAchiKey, namespace, "getPlAchiKey");//获取一个玩家指定成就词条的信息
+ll.export(PlDataManager.getPlAchiInfoStatistic, namespace, "getPlAchiInfoStatistic");//获取一个玩家成就的统计信息
 
 //语言数据操作导出
 ll.export(LangManager.getAchievementEntry, namespace, "getAchievementEntry");//获取一个成就词条的信息
