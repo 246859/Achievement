@@ -1,4 +1,4 @@
-ll.require("Achievement.Gui.js");
+ll.require("Achievement-Gui.js");
 const printObj = ll.import("bbc", "printObj");
 
 function test() {
