@@ -835,10 +835,6 @@ class LangManager {
             if (details) Runtime.entryTotalCounts += Object.keys(entry[type].details).length;
             else LogUtils.error(Runtime.SystemInfo.init.invalidType, type);
         }
-        //将成就类型数量写入缓存中
-        PersistentCache.set(Constant.typeCount, Runtime.entryTypeTotalCounts);
-        //将词条类型数量写入缓存中
-        PersistentCache.set(Constant.totalCount, Runtime.entryTotalCounts);
     }
 
     /**
@@ -1326,6 +1322,10 @@ class Configuration {
         PersistentCache.set(Constant.version, PLUGINS_INFO.version);
         //统计词条数量
         LangManager.statisticEntry(Runtime.entry);
+        //将成就类型数量写入缓存中
+        PersistentCache.set(Constant.typeCount, Runtime.entryTypeTotalCounts);
+        //将词条类型数量写入缓存中
+        PersistentCache.set(Constant.totalCount, Runtime.entryTotalCounts);
     }
 
     /**
@@ -1435,20 +1435,20 @@ class PlDataManager {
     }
 
     /**
-     * 获取一个玩家的统计信息
+     * 获取一个玩家的类型统计信息
      * {
      *     玩家已完成成就数量
      *     玩家未完成成就数量
-     *     已完成的成就列表
-     *     未完成的成就列表
+     *     已完成的成就类型列表 只要玩家完成了任意成就类型的的任意一个，那么该成绩类型就应该出现在已完成列表中
+     *     未完成的成就类型列表 只要玩家在任意类型中，还有任意一个未完成的成就，那么该成就类型就应该出现在未完成列表中。
      * }
      */
     static getPlAchiInfoStatistic(xuid) {
         if (!PlDataManager.hasPlayerInfo(xuid)) return undefined;
         let finished = PlDataManager.getPlAchiInfo(xuid).finished;
-        let finishedList = PlDataManager.getPlAchiTypeList(xuid);
-        let allList = LangManager.getLangEntryTypeList();
-        let unFinishedList = allList.filter(item => !finishedList.some(ele => ele.type === item.type));
+        let finishedList = PlDataManager.getTypeList(xuid);
+        // PlDataManager.setPlAchiType(xuid, "eat", LangManager.getAchievementEntryType("eat").details);//暂时将所有的食物成就赋值给玩家,测试是否能成功过滤
+        let unFinishedList = PlDataManager.getUnFinishedTypeList(xuid);
         return {
             finished,
             unFinished: Runtime.entryTotalCounts - finished,
@@ -1458,11 +1458,41 @@ class PlDataManager {
     }
 
     /**
-     * 获取一个玩家的已成就列表
+     * 获取一个玩家成就类型的细节统计信息
+     * {
+     *     该类型下已完成成就的列表
+     *     该类型下未完成的成就列表
+     * }
+     * @param xuid
+     * @param type
+     */
+    static getPlAchiDetailsStatistic(xuid, type) {
+        return {
+            finishedList: PlDataManager.getDetailsList(xuid, type),
+            unFinishedList: PlDataManager.getUnFinishedDetailsList(xuid, type)
+        };
+    }
+
+    /**
+     * 判断一个玩家是否获得了一个类型的所有成就
+     * @param xuid
+     * @param type
+     */
+    static isGetAllAchiInType(xuid, type) {
+        if (!PlDataManager.hasPlayerInfo(xuid)) return false;
+        let plDetails = PlDataManager.getPlAchiType(xuid, type);//获得一个玩家该类型下的所有词条
+        if (!plDetails) return false;//倘若此种成就类型还解开直接返回false
+        let entryDetails = LangManager.getAchievementEntryType(type).details;//获得词库中该类型下所有词条
+        //判断两者是否长度相等
+        return Object.keys(plDetails).length >= Object.keys(entryDetails).length;
+    }
+
+    /**
+     * 获取一个玩家的已完成成就类型列表
      * @param xuid
      * @returns {*[]|undefined}
      */
-    static getPlAchiTypeList(xuid) {
+    static getTypeList(xuid) {
         if (!PlDataManager.hasPlayerInfo(xuid)) return undefined;
         let details = PlDataManager.getPlAchiInfo(xuid).details;
         let res = [];
@@ -1473,6 +1503,55 @@ class PlDataManager {
                 type,
                 name: entryType.name,
                 ui: entryType.ui
+            });
+        }
+        return res;
+    }
+
+    /**
+     * 获取一个玩家未完成的成就类型列表
+     * @param xuid
+     * @returns {*[]}
+     */
+    static getUnFinishedTypeList(xuid) {
+        let allList = LangManager.getLangEntryTypeList();
+        return allList.filter(item => !PlDataManager.isGetAllAchiInType(xuid, item.type));
+    }
+
+    /**
+     * 获取一个玩家某个类型种已完成的成就列表
+     * @param xuid
+     * @param type
+     */
+    static getDetailsList(xuid, type) {
+        if (!PlDataManager.hasPlAchiType(xuid, type)) return [];
+        let entryTypeDetails = PlDataManager.getPlAchiType(xuid, type);
+        let res = [];
+        for (let detailsKey in entryTypeDetails) {
+            let langDetails = LangManager.getAchievementEntry(type, detailsKey);
+            res.push({
+                key: detailsKey,
+                name: langDetails.msg,
+            });
+        }
+        return res;
+    }
+
+    /**
+     * 获取一个玩家某个类型种未完成的成就列表
+     * @param xuid
+     * @param type
+     */
+    static getUnFinishedDetailsList(xuid, type) {
+        if (!PlDataManager.hasPlayerInfo(xuid)) return [];
+        let finishedDetails = PlDataManager.getDetailsList(xuid, type);
+        let entryTypeAllDetails = LangManager.getAchievementEntryType(type).details;
+        let res = [];
+        for (let entryKey in entryTypeAllDetails) {
+            if (finishedDetails.some(detial => detial.key === entryKey)) continue;
+            res.push({
+                key: entryKey,
+                name: entryTypeAllDetails[entryKey].msg
             });
         }
         return res;
@@ -3747,7 +3826,7 @@ class AfterFinished {
     static ENTRY = {
         zh_CN: {
             "achiCount": {
-                enable: true, name: "成就数量成就", ui: "textures/ui/icon_multiplayer", details: {
+                enable: true, name: "进度成就", ui: "textures/ui/icon_multiplayer", details: {
                     "${}>=10": new Achievement("小有名气", "达成10个成就"),
                     "${}>=50": new Achievement("轻车熟路", "达成50个成就"),
                     "${}>=80": new Achievement("游戏人生", "达成80个成就"),
@@ -3928,7 +4007,8 @@ ll.export(LogUtils.error, namespace, "errorLog");
 ll.export(PlDataManager.getPlAchiInfo, namespace, "getPlAchiInfo");//获取一个玩家的成就信息
 ll.export(PlDataManager.getPlAchiType, namespace, "getPlAchiType");//获取一个玩家成就类型的信息
 ll.export(PlDataManager.getPlAchiKey, namespace, "getPlAchiKey");//获取一个玩家指定成就词条的信息
-ll.export(PlDataManager.getPlAchiInfoStatistic, namespace, "getPlAchiInfoStatistic");//获取一个玩家成就的统计信息
+ll.export(PlDataManager.getPlAchiInfoStatistic, namespace, "getPlAchiInfoStatistic");//获取一个玩家成就类型的统计信息
+ll.export(PlDataManager.getPlAchiDetailsStatistic, namespace, "getPlAchiDetailsStatistic");//获取一个玩家成就类型的细节统计信息
 
 //语言数据操作导出
 ll.export(LangManager.getAchievementEntry, namespace, "getAchievementEntry");//获取一个成就词条的信息
@@ -3942,3 +4022,7 @@ ll.export(StringEqual.stringEqualImpl, namespace, "stringEqualImpl");//字符串
 ll.export(NumberChange.numberChangeImpl, namespace, "numberChangeImpl");//数字成就处理
 ll.export(SpecialType.specialImpl, namespace, "specialImpl");//特殊成就处理
 ll.export(EventProcessor.eventImplsProcess, namespace, "eventImplsProcess");//成就事件处理
+
+/**
+ * 说实话真的没想到核心插件在写完的时候代码能有4000多行，单文件结构的插件真的很臃肿，日后一定要用c++重写
+ */
