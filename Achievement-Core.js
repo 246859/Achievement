@@ -21,7 +21,7 @@ const DEFAULT_PLAYER_DATA = {};
  * @type Object
  */
 const DEFAULT_CONFIG = {
-    language: ZH_CN,//插件语言
+    language: EN_US,//插件语言
     display: {//成就完成后的展示
         scope: 2,//作用范围 2所有人都能看到，1仅个人能看到，0不展示
         toast: {//成就弹窗
@@ -2377,7 +2377,7 @@ class Join {
             }
         }, en_US: {
             [SpecialType.TYPE]: {
-                enable: true, name: "Special Achievement", details: {
+                enable: true, name: "Special Achievement", ui: "textures/ui/enable_editor", details: {
                     join: new Achievement("Hello World!", "Enter the server for the first time"),
                 }, regx: {}
             }
@@ -2464,7 +2464,7 @@ class ChangeDim {
             }
         }, en_US: {
             changeDim: {
-                enable: true, name: "Dimension Achievement", details: {
+                enable: true, name: "Dimension Achievement", ui: "textures/ui/realmPortalSmall", details: {
                     "0": new Achievement("What a wonderful world", "Return to the main world"),
                     "1": new Achievement("Hell is empty, the devil is on earth", "Arrived in hell"),
                     "2": new Achievement("The dimension of the eternal, starless night", "reach the end")
@@ -2535,7 +2535,7 @@ class Destroy {
 
         }, en_US: {
             destroyBlock: {
-                enable: true, name: "Mining Achievement", details: {
+                enable: true, name: "Mining Achievement", ui: "textures/ui/icon_iron_pickaxe", details: {
                     "minecraft:log": new Achievement("To get rich, first smash trees!", "First cut down logs"),
                     "minecraft:stone": new Achievement("Crazy Stone!", "First Stone Mining"),
                     "minecraft:coal_ore": new Achievement("The face is full of dust and fireworks, the temples are black and the fingers are black", "The first coal mine was dug"),
@@ -2615,7 +2615,7 @@ class Place {
             }
         }, en_US: {
             place: {
-                enable: true, name: "Place Achievement", details: {
+                enable: true, name: "Place Achievement", ui: "textures/ui/icon_rail_normal", details: {
                     "minecraft:flower_pot": new Achievement("Prepare for gardening", "Place a flowerpot"),
                     "minecraft:sapling": new Achievement("Environmental work", "Planting a sapling"),
                     "minecraft:sign": new Achievement("Tell the big guys!", "Place a sign"),
@@ -2694,7 +2694,7 @@ class PlDie {
             }
         }, en_US: {
             death: {
-                enable: true, name: "Death Achievement", details: {
+                enable: true, name: "Death Achievement", ui: "textures/ui/friend_glyph_desaturated", details: {
                     "minecraft:creeper": new Achievement("Sudden surprise!", "Death to creeper"),
                     "minecraft:zombie": new Achievement("Falled in corpse tide", "died by zombies"),
                     "minecraft:skeleton": new Achievement("Middle Door vs. Spy", "Death to Xiaobai"),
@@ -2846,7 +2846,7 @@ class MobDie {
             },
         }, en_US: {
             killer: {
-                enable: true, name: "Kill Achievement", details: {
+                enable: true, name: "Kill Achievement", ui: "textures/ui/promo_creeper", details: {
                     "minecraft:creeper": new Achievement("Sh~hh~", "Kill Creeper for the first time"),
                     "minecraft:zombie": new Achievement("Zombie Siege", "First time kill a zombie"),
                     "minecraft:skeleton": new Achievement("Dongfeng Express, the mission must be reached", "Kill Xiaobai for the first time"),
@@ -3005,7 +3005,7 @@ class ScoreChange {
             },
         }, en_US: {
             [this.ECONOMY_TYPE]: {
-                enable: true, name: "Economic Achievement", details: {
+                enable: true, name: "Economic Achievement", ui: "textures/ui/icon_minecoin_9x9", details: {
                     "${}<=0": new Achievement("Big loser", "Economy reaches 0"),
                     "${}>=1000": new Achievement("Subsistence allowances", "Economy reaches 1k"),
                     "${}>=10000": new Achievement("Humble social animal", "Economy reaches 1w"),
@@ -3233,7 +3233,7 @@ class InventoryChange {
             }
         }, en_US: {
             itemObtain: {
-                enable: true, name: "Item Achievement", details: {
+                enable: true, name: "Item Achievement", ui: "textures/ui/promo_gift_small_yellow", details: {
                     "minecraft:furnace": new Achievement("Chat is hot!", "Get the furnace for the first time"),
                     "minecraft:crafting_table": new Achievement("It's time to work!", "Get a crafting table for the first time"),
                     "minecraft:torch": new Achievement("Light the way forward!", "Get the torch for the first time"),
@@ -3444,7 +3444,7 @@ class Eat {
             }
         }, en_US: {
             eat: {
-                enable: true, name: "Food Achievement", details: {
+                enable: true, name: "Food Achievement", ui: "textures/ui/icon_cookie", details: {
                     "minecraft:pufferfish": new Achievement("Sour!", "Eat a pufferfish"),
                     "minecraft:cookie": new Achievement("Whether to accept all cookie settings from this website", "Eat a cookie"),
                     "minecraft:dried_kelp": new Achievement("The taste of the sea, I know", "Eat a kelp"),
@@ -3515,7 +3515,7 @@ class ArmorSet {
             }
         }, en_US: {
             armor: {
-                enable: true, name: "Equipment Achievement", details: {
+                enable: true, name: "Equipment Achievement", ui: "textures/ui/icon_armor", details: {
                     "setAll": new Achievement("Full Armor", "Equip a set of any armor"),
                     "preFly": new Achievement("Wuhu take off!", "Elypse equipped"),
                     "netheriteAll": new Achievement("Armed to the teeth", "Equip a set of alloy armor")
@@ -3620,7 +3620,7 @@ class BedEnter {
             }
         }, en_US: {
             sleep: {
-                enable: true, name: "Sleep Achievement", details: {
+                enable: true, name: "Sleep Achievement", ui: "textures/ui/icon_recipe_item", details: {
                     "cloudDream": new Achievement("Cloud Dream", "Sleep a night above the clouds"),
                     "undergroundDream": new Achievement("Breath of the Abyss", "Sleep one night on the cave floor"),
                     "normalDream": new Achievement("Full of energy", "Sleep safely at night"),
@@ -3846,7 +3846,7 @@ class AfterFinished {
             }
         }, en_US: {
             "achiCount": {
-                enable: true, name: "Number of achievements", details: {
+                enable: true, name: "Progress achievements", ui: "textures/ui/icon_multiplayer", details: {
                     "${}>=10": new Achievement("Little famous", "Achieved 10 achievements"),
                     "${}>=50": new Achievement("Familiarity", "Achieve 50 achievements"),
                     "${}>=80": new Achievement("Game of Life", "Achieve 80 achievements"),
@@ -4096,6 +4096,17 @@ class Interface {
     specialAchievementImpl(pl, key, isNum = false, multipart = false) {
         return SpecialType.specialImpl(pl, key, isNum, multipart);
     }
+
+    /**
+     * 渲染一个模板
+     * @param str
+     * @param args
+     * @return {*}
+     */
+    renderTemplate(str, ...args) {
+        return Utils.loadTemplate(str, ...args);
+    }
+
 
 }
 
