@@ -4149,7 +4149,7 @@ class Application {
         const cons = "constructor";
         //获取所有的属性列表
         const properties = Object.getOwnPropertyNames(Interface.prototype);
-        let count = 0;
+        let count = 1;
         for (const propertiesKey in properties) {
             if (properties[propertiesKey] !== cons && Interface.prototype[properties[propertiesKey]]) {
                 ll.export(Interface.prototype[properties[propertiesKey]], Application.namespace, properties[propertiesKey]);
