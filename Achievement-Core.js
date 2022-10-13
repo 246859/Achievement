@@ -866,7 +866,7 @@ class LangManager {
     }
 
     /**
-     * 获取所有的词条列表
+     * 获取所有的词条类型列表
      */
     static getLangEntryTypeList() {
         let entry = LangManager.getLangEntry();
@@ -875,6 +875,23 @@ class LangManager {
             if (!entry[type].enable) continue;
             res.push({
                 type, name: entry[type].name, ui: entry[type].ui,
+            });
+        }
+        return res;
+    }
+
+    /**
+     * 获取指定类型中所有的词条列表
+     */
+    static getLangEntryDetailsList(type) {
+        let entryType = LangManager.getAchievementEntryType(type);
+        if (!entryType || !entryType.enable) return [];
+        let details = entryType.details;
+        let res = [];
+        for (let key in details) {
+            if (!details[key].enable) continue;
+            res.push({
+                key, name: details[key].msg, ui: details[key].ui
             });
         }
         return res;
@@ -1441,7 +1458,12 @@ class PlDataManager {
      * }
      */
     static getPlAchiInfoStatistic(xuid) {
-        if (!PlDataManager.hasPlayerInfo(xuid)) return undefined;
+        if (!PlDataManager.hasPlayerInfo(xuid)) return {
+            finished: 0,
+            unFinished: Runtime.entryTotalCounts,
+            finishedList: [],
+            unFinishedList: LangManager.getLangEntryTypeList()
+        };
         let finished = PlDataManager.getPlAchiInfo(xuid).finished;
         let finishedList = PlDataManager.getTypeList(xuid);
         // PlDataManager.setPlAchiType(xuid, "eat", LangManager.getAchievementEntryType("eat").details);//暂时将所有的食物成就赋值给玩家,测试是否能成功过滤
@@ -1522,7 +1544,7 @@ class PlDataManager {
         for (let detailsKey in entryTypeDetails) {
             let langDetails = LangManager.getAchievementEntry(type, detailsKey);
             res.push({
-                key: detailsKey, name: langDetails.msg,
+                key: detailsKey, name: langDetails.msg, ui: langDetails.ui
             });
         }
         return res;
@@ -1534,17 +1556,10 @@ class PlDataManager {
      * @param type
      */
     static getUnFinishedDetailsList(xuid, type) {
-        if (!PlDataManager.hasPlayerInfo(xuid)) return [];
+        if (!PlDataManager.hasPlayerInfo(xuid)) return LangManager.getLangEntryDetailsList(type);
         let finishedDetails = PlDataManager.getDetailsList(xuid, type);
-        let entryTypeAllDetails = LangManager.getAchievementEntryType(type).details;
-        let res = [];
-        for (let entryKey in entryTypeAllDetails) {
-            if (finishedDetails.some(detial => detial.key === entryKey)) continue;
-            res.push({
-                key: entryKey, name: entryTypeAllDetails[entryKey].msg
-            });
-        }
-        return res;
+        let allDetailsList = LangManager.getLangEntryDetailsList(type);
+        return allDetailsList.filter(item => !finishedDetails.some(ele => item.type === ele.type));
     }
 
 
@@ -1912,10 +1927,16 @@ class Achievement {
      */
     condition;
 
-    constructor(msg, condition) {
+    /**
+     * 图标
+     */
+    ui;
+
+    constructor(msg, condition, ui) {
         this.enable = true;
         this.msg = msg;
         this.condition = condition;
+        this.ui = ui;
     }
 
     static assign(obj) {
@@ -2351,7 +2372,7 @@ class Join {
         zh_CN: {
             [SpecialType.TYPE]: {
                 enable: true, name: "特殊成就", ui: "textures/ui/enable_editor", details: {
-                    join: new Achievement("Hello World!", "首次进入服务器"),
+                    join: new Achievement("Hello World!", "首次进入服务器", "textures/ui/enable_editor"),
                 }, regx: {}
             }
         }, en_US: {
