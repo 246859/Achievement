@@ -275,7 +275,7 @@ function sleep(time) {
  */
 async function waitingCoreLoaded() {
     while (!isAppLoaded()) {
-        await sleep(400);
+        await sleep(1000);
     }
     return true;
 }

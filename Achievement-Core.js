@@ -182,7 +182,7 @@ const Constant = {
 const Runtime = {
     entryTypeTotalCounts: 0,//当前版本成就类型总数
     entryTotalCounts: 0,//当前版本成就词条总数
-    config: {debug: true, language: ZH_CN},//配置对象
+    config: {debug: false, language: ZH_CN},//配置对象
     entry: {},//词条对象
     rewardManager: undefined,//奖励对象
     displayManger: undefined,//展示对象
@@ -4130,7 +4130,6 @@ class Application {
             Configuration.postData();
             LogUtils.info(Utils.loadTemplate(Runtime.SystemInfo.init.currentLang, Runtime.config.language));
             LogUtils.info(Utils.loadTemplate(Runtime.SystemInfo.init.initEntryCount, Runtime.entryTypeTotalCounts, Runtime.entryTotalCounts, EventProcessor.EVENT_PROCESSOR_LIST.length));
-            Application.exportInterfaces();
             this.isLoaded = true;
         }).catch(err => {
             LogUtils.error(Runtime.SystemInfo.init.initError, err);
@@ -4164,6 +4163,7 @@ class Application {
 }
 
 Application.main();
+Application.exportInterfaces();
 
 const Banner = "\n" + "              _     _                                     _          ___    ___   ___  \n" + "    /\\       | |   (_)                                   | |        |__ \\  / _ \\ / _ \\ \n" + "   /  \\   ___| |__  _  _____   _____ _ __ ___   ___ _ __ | |_  __   __ ) || | | | | | |\n" + "  / /\\ \\ / __| '_ \\| |/ _ \\ \\ / / _ \\ '_ ` _ \\ / _ \\ '_ \\| __| \\ \\ / // / | | | | | | |\n" + " / ____ \\ (__| | | | |  __/\\ V /  __/ | | | | |  __/ | | | |_   \\ V // /_ | |_| | |_| |\n" + "/_/    \\_\\___|_| |_|_|\\___| \\_/ \\___|_| |_| |_|\\___|_| |_|\\__|   \\_/|____(_)___(_)___/\n";
 
