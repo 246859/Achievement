@@ -21,7 +21,7 @@ const DEFAULT_PLAYER_DATA = {};
  * @type Object
  */
 const DEFAULT_CONFIG = {
-    language: EN_US,//插件语言
+    language: ZH_CN,//插件语言
     display: {//成就完成后的展示
         scope: 2,//作用范围 2所有人都能看到，1仅个人能看到，0不展示
         toast: {//成就弹窗
@@ -38,7 +38,7 @@ const DEFAULT_CONFIG = {
             enable: true,//是否开启
             type: "llmoney",//经济类型 score | llmoney
             score: "money",//计分板名称
-            value: 300,//要增加的经济值
+            value: 10,//要增加的经济值
         }, exp: {//经验奖励
             enable: true,//是否开启
             value: 50//要增加的经验值
@@ -49,8 +49,8 @@ const DEFAULT_CONFIG = {
             lore: ["成就奖励物品"]//物品lore
         }
     }, antiShake: 400, //防抖粒度
-    checkUpdate: true,//检查更新
-    debug: true,//调试模式
+    checkUpdate: false,//检查更新
+    debug: false,//调试模式
 };
 
 /**
@@ -2166,7 +2166,7 @@ class NumberChange {
 
     static numberChangeImpl(pl, type, num, multipart = false) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        EventProcessor.eventImplsProcess(NumberChange, [pl, type, num, multipart], NumberChange.EventImplList).catch(err => {
+        return EventProcessor.eventImplsProcess(NumberChange, [pl, type, num, multipart], NumberChange.EventImplList).catch(err => {
             LogUtils.error(`${NumberChange.EVENT}: `, err);
         });
     }
@@ -2271,11 +2271,9 @@ class StringEqual {
 
     static EventImplList = ["defaultImpl"];
 
-    static stringEqualImpl(pl, type, key) {
+    static async stringEqualImpl(pl, type, key) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (Utils.isShaking(pl, type)) return;
-        EventProcessor.antiEventShake(pl, type);
-        EventProcessor.eventImplsProcess(StringEqual, [pl, type, key], StringEqual.EventImplList).catch(err => {
+        return EventProcessor.eventImplsProcess(StringEqual, [pl, type, key, key], StringEqual.EventImplList).catch(err => {
             LogUtils.error(`${StringEqual.EVENT}: `, err);
         });
     }
@@ -2311,8 +2309,6 @@ class SpecialType {
 
     static specialImpl(pl, key, isNum = false, multipart = false) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (Utils.isShaking(pl, SpecialType.TYPE)) return;
-        EventProcessor.antiEventShake(pl, SpecialType.TYPE);
         EventProcessor.eventImplsProcess(StringEqual, [pl, key, isNum, multipart], StringEqual.EventImplList).catch(err => {
             LogUtils.error(`${SpecialType.EVENT}: `, err);
         });
@@ -3974,6 +3970,24 @@ class Interface {
     }
 
     /**
+     * 获取插件核心的加载状态
+     * @return {boolean}
+     */
+    isAppLoaded() {
+        return Application.isAppLoaded();
+    }
+
+    /**
+     * 渲染一个模板
+     * @param str
+     * @param args
+     * @return {*}
+     */
+    renderTemplate(str, ...args) {
+        return Utils.loadTemplate(str, ...args);
+    }
+
+    /**
      * 通过xuid获取一个指定玩家的成就信息
      * @param xuid
      * @returns Object
@@ -4022,7 +4036,7 @@ class Interface {
 
     /**
      * 获取所有成就词条的数量统计
-     * @return {{entryCount: number, typeCount: number}}
+     * @return {{entryCount: number, typeCount: number}}-
      */
     getAchievementStatistic() {
         return LangManager.getAchievementStatistic();
@@ -4067,46 +4081,35 @@ class Interface {
 
     /**
      * 字符串成就实现
-     * @param pl
+     * @param xuid
      * @param type
      * @param key
      */
-    stringAchievementImpl(pl, type, key) {
-        return StringEqual.stringEqualImpl(pl, type, key);
+    stringAchievementImpl(xuid, type, key) {
+        return StringEqual.stringEqualImpl(mc.getPlayer(xuid), type, key);
     }
 
     /**
      * 数字成就实现
-     * @param pl
+     * @param xuid
      * @param type
      * @param num
      * @param multipart
      */
-    numberAchievementImpl(pl, type, num, multipart = false) {
-        return NumberChange.numberChangeImpl(pl, type, num, multipart);
+    numberAchievementImpl(xuid, type, num, multipart = false) {
+        return NumberChange.numberChangeImpl(mc.getPlayer(xuid), type, num, multipart);
     }
 
     /**
      * 特殊成就实现
-     * @param pl
+     * @param xuid
      * @param key
      * @param isNum
      * @param multipart
      */
-    specialAchievementImpl(pl, key, isNum = false, multipart = false) {
-        return SpecialType.specialImpl(pl, key, isNum, multipart);
+    specialAchievementImpl(xuid, key, isNum = false, multipart = false) {
+        return SpecialType.specialImpl(mc.getPlayer(xuid), key, isNum, multipart);
     }
-
-    /**
-     * 渲染一个模板
-     * @param str
-     * @param args
-     * @return {*}
-     */
-    renderTemplate(str, ...args) {
-        return Utils.loadTemplate(str, ...args);
-    }
-
 
 }
 
@@ -4169,8 +4172,3 @@ LogUtils.info(Banner);
 LogUtils.info(PLUGINS_INFO.version);
 LogUtils.info("MineBBS: https://www.minebbs.com/resources/3434/");
 LogUtils.info("Github: https://github.com/246859/Achievement");
-
-//命名空间
-const namespace = "Achievement";
-//插件是否加载完毕
-ll.export(Application.isAppLoaded, namespace, "isAppLoaded");

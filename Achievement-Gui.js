@@ -1,6 +1,6 @@
 /**
  * 说实话作者其实主要方向是Java|Go后端开发，所以比较讨厌表单页面什么之类的，不过这里的表单可比web的表单简单多了，尽管如此
- * 代码相比于核心插件而言，可能还是会显得凌乱一些，毕竟只是花了两个小时随便写的，如果有不满意可以根据导出的接口自行编写表单。
+ * 代码相比于核心插件而言，可能还是会显得凌乱一些，毕竟只是花了两个小时随便写的，如果有不满意可以根据导出的接口自行编写表单(回调地狱)
  */
 
 ll.require("Achievement-Core.js");
@@ -17,6 +17,7 @@ const getPlayerDetailStatistic = ll.import(namespace, "getPlayerDetailStatistic"
 const getAchievementEntry = ll.import(namespace, "getAchievementEntry");//获取一个成就词条
 const renderTemplate = ll.import(namespace, "renderTemplate");
 const getConfig = ll.import(namespace, "getConfig");
+const stringAchievementImpl = ll.import(namespace, "stringAchievementImpl");
 
 
 const DEFAULT_MENU = {
