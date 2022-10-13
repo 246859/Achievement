@@ -112,6 +112,7 @@ const Constant = {
                 currentLang: "当前语言为: ${}",
                 initialData: "初始运行时数据: ${}",
                 initEntryCount: "成就插件成功加载,总计${}种成就类型,${}个成就词条,${}个事件监听",
+                exportCount: "成就核心插件成功导出接口${}个",
                 backUp: "检测到插件版本与本地缓存版本不一致，即将开始备份，随后将更新本地文件",
                 backUpSuccess: "备份成功保存在路径:",
                 initError: "插件启动异常: ",
@@ -832,8 +833,7 @@ class LangManager {
         Runtime.entryTypeTotalCounts = Object.keys(entry).length;
         for (let type in entry) {
             let details = entry[type].details;
-            if (details) Runtime.entryTotalCounts += Object.keys(entry[type].details).length;
-            else LogUtils.error(Runtime.SystemInfo.init.invalidType, type);
+            if (details) Runtime.entryTotalCounts += Object.keys(entry[type].details).length; else LogUtils.error(Runtime.SystemInfo.init.invalidType, type);
         }
     }
 
@@ -842,8 +842,7 @@ class LangManager {
      */
     static getAchievementStatistic() {
         return {
-            entryCount: Runtime.entryTotalCounts,
-            typeCount: Runtime.entryTypeTotalCounts
+            entryCount: Runtime.entryTotalCounts, typeCount: Runtime.entryTypeTotalCounts
         };
     }
 
@@ -875,9 +874,7 @@ class LangManager {
         for (let type in entry) {
             if (!entry[type].enable) continue;
             res.push({
-                type,
-                name: entry[type].name,
-                ui: entry[type].ui,
+                type, name: entry[type].name, ui: entry[type].ui,
             });
         }
         return res;
@@ -1450,10 +1447,7 @@ class PlDataManager {
         // PlDataManager.setPlAchiType(xuid, "eat", LangManager.getAchievementEntryType("eat").details);//暂时将所有的食物成就赋值给玩家,测试是否能成功过滤
         let unFinishedList = PlDataManager.getUnFinishedTypeList(xuid);
         return {
-            finished,
-            unFinished: Runtime.entryTotalCounts - finished,
-            finishedList,
-            unFinishedList
+            finished, unFinished: Runtime.entryTotalCounts - finished, finishedList, unFinishedList
         };
     }
 
@@ -1500,9 +1494,7 @@ class PlDataManager {
             let entryType = LangManager.getAchievementEntryType(type);
             if (!entryType.enable) continue;
             res.push({
-                type,
-                name: entryType.name,
-                ui: entryType.ui
+                type, name: entryType.name, ui: entryType.ui
             });
         }
         return res;
@@ -1530,8 +1522,7 @@ class PlDataManager {
         for (let detailsKey in entryTypeDetails) {
             let langDetails = LangManager.getAchievementEntry(type, detailsKey);
             res.push({
-                key: detailsKey,
-                name: langDetails.msg,
+                key: detailsKey, name: langDetails.msg,
             });
         }
         return res;
@@ -1550,8 +1541,7 @@ class PlDataManager {
         for (let entryKey in entryTypeAllDetails) {
             if (finishedDetails.some(detial => detial.key === entryKey)) continue;
             res.push({
-                key: entryKey,
-                name: entryTypeAllDetails[entryKey].msg
+                key: entryKey, name: entryTypeAllDetails[entryKey].msg
             });
         }
         return res;
@@ -2749,8 +2739,7 @@ class AttackEntity {
                     "counterattack": new Achievement("自食其果", "将恶魂的火球反弹击杀恶魂")
                 }, regx: {}
             }
-        },
-        en_US: {
+        }, en_US: {
             [SpecialType.TYPE]: {
                 enable: true, name: "Special Achievement", details: {
                     "counterattack": new Achievement("Bounce the ghast", "Bounce the ghast's fireball to kill the ghast")
@@ -3834,8 +3823,7 @@ class AfterFinished {
                     "${}>=150": new Achievement("骨灰玩家", "达成150个成就"),
                 }, regx: {}
             }
-        },
-        en_US: {
+        }, en_US: {
             "achiCount": {
                 enable: true, name: "Number of achievements", details: {
                     "${}>=10": new Achievement("Little famous", "Achieved 10 achievements"),
@@ -3951,6 +3939,144 @@ class EventProcessor {
     }
 }
 
+/**
+ * 对外暴露的接口需要注意的是
+ */
+class Interface {
+
+    /**
+     * 获取核心插件运行时配置
+     * @return {{debug: boolean, language: string}}
+     */
+    getConfig() {
+        return Runtime.config;
+    }
+
+    /**
+     * 通过xuid获取一个指定玩家的成就信息
+     * @param xuid
+     * @returns Object
+     */
+    getPlayerInfo(xuid) {
+        return PlDataManager.getPlAchiInfo(xuid);
+    }
+
+    /**
+     * 通过xuid,type,获取一个指定玩家的成就类型的信息
+     * @param xuid
+     * @param type
+     */
+    getPlayerTypeInfo(xuid, type) {
+        return PlDataManager.getPlAchiType(xuid, type);
+    }
+
+    /**
+     * 获取一个指定玩家指定成就类型下指定词条的信息
+     * @param xuid
+     * @param type
+     * @param key
+     */
+    getPlayerKeyInfo(xuid, type, key) {
+        return PlDataManager.getPlAchiKey(xuid, type, key);
+    }
+
+    /**
+     * 获取一个玩家所有成就类型的统计信息
+     * @param xuid
+     * @return {{unFinished, unFinishedList: *[], finishedList: *[]|undefined, finished: *}}
+     */
+    getPlayerTypeStatistic(xuid) {
+        return PlDataManager.getPlAchiInfoStatistic(xuid);
+    }
+
+    /**
+     * 获取一个玩家指定成就类型的统计信息
+     * @param xuid
+     * @param type
+     * @return {{unFinishedList: ([]|*[]), finishedList: ([]|*[])}}
+     */
+    getPlayerDetailStatistic(xuid, type) {
+        return PlDataManager.getPlAchiDetailsStatistic(xuid, type);
+    }
+
+    /**
+     * 获取所有成就词条的数量统计
+     * @return {{entryCount: number, typeCount: number}}
+     */
+    getAchievementStatistic() {
+        return LangManager.getAchievementStatistic();
+    }
+
+    /**
+     * 获取所有的成就信息
+     * @return {*}
+     */
+    getAchievement() {
+        return LangManager.getLangEntry();
+    }
+
+    /**
+     * 获取一个成就类型的信息
+     * @param type
+     * @return {*}
+     */
+    getAchievementType(type) {
+        return LangManager.getAchievementEntryType(type);
+    }
+
+    /**
+     * 获取一个指定成就类型的指定词条的信息
+     * @param type
+     * @param key
+     * @return {*}
+     */
+    getAchievementEntry(type, key) {
+        return LangManager.getAchievementEntry(type, key);
+    }
+
+    /**
+     * 获取一个指定类型中真实的词条名称
+     * @param type
+     * @param key
+     * @return {*}
+     */
+    getAchievementTriggerName(type, key) {
+        return LangManager.getAchievementTriggerName(type, key);
+    }
+
+    /**
+     * 字符串成就实现
+     * @param pl
+     * @param type
+     * @param key
+     */
+    stringAchievementImpl(pl, type, key) {
+        return StringEqual.stringEqualImpl(pl, type, key);
+    }
+
+    /**
+     * 数字成就实现
+     * @param pl
+     * @param type
+     * @param num
+     * @param multipart
+     */
+    numberAchievementImpl(pl, type, num, multipart = false) {
+        return NumberChange.numberChangeImpl(pl, type, num, multipart);
+    }
+
+    /**
+     * 特殊成就实现
+     * @param pl
+     * @param key
+     * @param isNum
+     * @param multipart
+     */
+    specialAchievementImpl(pl, key, isNum = false, multipart = false) {
+        return SpecialType.specialImpl(pl, key, isNum, multipart);
+    }
+
+}
 
 /**
  * 启动类
@@ -3958,6 +4084,8 @@ class EventProcessor {
 class Application {
 
     static isLoaded = false;
+
+    static namespace = "Achievement";
 
     static main() {
         Configuration.init().then(() => {
@@ -3967,6 +4095,7 @@ class Application {
             Configuration.postData();
             LogUtils.info(Utils.loadTemplate(Runtime.SystemInfo.init.currentLang, Runtime.config.language));
             LogUtils.info(Utils.loadTemplate(Runtime.SystemInfo.init.initEntryCount, Runtime.entryTypeTotalCounts, Runtime.entryTotalCounts, EventProcessor.EVENT_PROCESSOR_LIST.length));
+            Application.exportInterfaces();
             this.isLoaded = true;
         }).catch(err => {
             LogUtils.error(Runtime.SystemInfo.init.initError, err);
@@ -3979,6 +4108,23 @@ class Application {
      */
     static isAppLoaded() {
         return Application.isLoaded;
+    }
+
+    /**
+     * 将Interface类中所有的方法导出
+     */
+    static exportInterfaces() {
+        const cons = "constructor";
+        //获取所有的属性列表
+        const properties = Object.getOwnPropertyNames(Interface.prototype);
+        let count = 0;
+        for (const propertiesKey in properties) {
+            if (properties[propertiesKey] !== cons && Interface.prototype[properties[propertiesKey]]) {
+                ll.export(Interface.prototype[properties[propertiesKey]], Application.namespace, properties[propertiesKey]);
+                count++;
+            }
+        }
+        LogUtils.info(Utils.loadTemplate(Runtime.SystemInfo.init.exportCount, count));
     }
 }
 
@@ -3994,35 +4140,5 @@ LogUtils.info("Github: https://github.com/246859/Achievement");
 
 //命名空间
 const namespace = "Achievement";
-
 //插件是否加载完毕
 ll.export(Application.isAppLoaded, namespace, "isAppLoaded");
-
-//日志
-ll.export(LogUtils.debug, namespace, "debugLog");
-ll.export(LogUtils.info, namespace, "infoLog");
-ll.export(LogUtils.error, namespace, "errorLog");
-
-//玩家数据操作导出
-ll.export(PlDataManager.getPlAchiInfo, namespace, "getPlAchiInfo");//获取一个玩家的成就信息
-ll.export(PlDataManager.getPlAchiType, namespace, "getPlAchiType");//获取一个玩家成就类型的信息
-ll.export(PlDataManager.getPlAchiKey, namespace, "getPlAchiKey");//获取一个玩家指定成就词条的信息
-ll.export(PlDataManager.getPlAchiInfoStatistic, namespace, "getPlAchiInfoStatistic");//获取一个玩家成就类型的统计信息
-ll.export(PlDataManager.getPlAchiDetailsStatistic, namespace, "getPlAchiDetailsStatistic");//获取一个玩家成就类型的细节统计信息
-
-//语言数据操作导出
-ll.export(LangManager.getAchievementEntry, namespace, "getAchievementEntry");//获取一个成就词条的信息
-ll.export(LangManager.getAchievementEntryType, namespace, "getAchievementEntryType");//获取一个成就类型的信息
-ll.export(LangManager.getAchievementTriggerName, namespace, "getAchievementTriggerName");//获取一个原始触发值对应的真实触发值
-ll.export(LangManager.getAchievementStatistic, namespace, "getAchievementStatistic");//获取成就词条的统计信息
-ll.export(LangManager.getLangEntry, namespace, "getLangEntry");//获取运行时所有的成就词条信息
-
-//成就处理导出
-ll.export(StringEqual.stringEqualImpl, namespace, "stringEqualImpl");//字符串成就处理
-ll.export(NumberChange.numberChangeImpl, namespace, "numberChangeImpl");//数字成就处理
-ll.export(SpecialType.specialImpl, namespace, "specialImpl");//特殊成就处理
-ll.export(EventProcessor.eventImplsProcess, namespace, "eventImplsProcess");//成就事件处理
-
-/**
- * 说实话真的没想到核心插件在写完的时候代码能有4000多行，单文件结构的插件真的很臃肿，日后一定要用c++重写
- */
