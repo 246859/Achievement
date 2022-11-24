@@ -3703,7 +3703,7 @@ class BedEnter {
         LogUtils.debug(`当前时间为: ${currentTime}`);
 
         //如果时间大于250则判断为不是清晨
-        return currentTime < 250 && (sleepActor >= 1 && sleepActor < 30);
+        return currentTime < 250 && (sleepActor >= 1 && sleepActor <= 30);
     }
 
 }
