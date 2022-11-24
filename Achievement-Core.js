@@ -48,7 +48,7 @@ const DEFAULT_CONFIG = {
             count: 1,//数量
             lore: ["成就奖励物品"]//物品lore
         }
-    }, antiShake: 400, //防抖粒度
+    }, antiShake: 100, //防抖粒度
     checkUpdate: false,//检查更新
     debug: false,//调试模式
 };
