@@ -5,7 +5,7 @@
  */
 
 const PLUGINS_INFO = {
-    name: "Achievement", version: "v2.0.0",
+    name: "Achievement", version: "v2.0.1",
 };
 
 const ZH_CN = "zh_CN";
