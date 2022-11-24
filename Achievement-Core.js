@@ -2390,7 +2390,6 @@ class Join {
      */
     static process(pl) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (EventProcessor.antiEventShake(pl, Join.EVENT)) return;
         LogUtils.debug(`参数列表:`, ...arguments);
         LogUtils.debug(`事件:${Join.EVENT} 名称:玩家进入服务器 对象:${pl.name}`);
         EventProcessor.eventImplsProcess(Join, [pl], Join.EventImplList).catch((err) => {
@@ -2424,7 +2423,6 @@ class Left {
      */
     static process(pl) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (EventProcessor.antiEventShake(pl, Left.EVENT)) return;
         //玩家退出游戏时要把一切tag删了
         EventProcessor.EVENT_PROCESSOR_LIST.forEach(processor => {
             if (processor.EVENT) {
@@ -2476,7 +2474,6 @@ class ChangeDim {
      */
     static process(pl, dimid) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (EventProcessor.antiEventShake(pl, ChangeDim.EVENT)) return;
         LogUtils.debug(`参数列表:`, ...arguments);
         LogUtils.debug(`事件:${ChangeDim.EVENT} 名称:玩家维度切 玩家:${pl.name} 维度:${dimid}`);
         EventProcessor.eventImplsProcess(ChangeDim, [pl, dimid], ChangeDim.EventImplList).catch(err => {
@@ -2570,7 +2567,6 @@ class Destroy {
      */
     static process(pl, bl) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (EventProcessor.antiEventShake(pl, Destroy.EVENT)) return;
         LogUtils.debug(`参数列表:`, ...arguments);
         LogUtils.debug(`事件:${Destroy.EVENT} 名称:玩家破坏方块 玩家:${pl.name} 方块:${bl.type}`);
         EventProcessor.eventImplsProcess(Destroy, [pl, bl], Destroy.EventImplList).catch(err => {
@@ -2630,7 +2626,6 @@ class Place {
 
     static process(pl, bl) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (EventProcessor.antiEventShake(pl, Place.EVENT)) return;
         LogUtils.debug(`参数列表:`, ...arguments);
         LogUtils.debug(`事件:${Place.EVENT} 名称:玩家放置方块 玩家:${pl.name} 方块:${bl.type}`);
         EventProcessor.eventImplsProcess(Place, [pl, bl], Place.EventImplList).catch(err => {
@@ -2730,7 +2725,6 @@ class PlDie {
 
     static process(pl, source) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (EventProcessor.antiEventShake(pl, PlDie.EVENT)) return;
         LogUtils.debug(`参数列表:`, ...arguments);
         LogUtils.debug(`事件:${PlDie.EVENT} 名称:玩家死亡 玩家:${pl.name} 来源:${source.type}`);
         EventProcessor.eventImplsProcess(PlDie, [pl, source], PlDie.EventImplList).catch(err => {
@@ -2769,7 +2763,6 @@ class AttackEntity {
 
     static process(pl, en) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (EventProcessor.antiEventShake(pl, AttackEntity.EVENT)) return;
         LogUtils.debug(`参数列表:`, ...arguments);
         LogUtils.debug(`事件:${AttackEntity.EVENT} 名称:玩家攻击实体 玩家:${pl.name} 实体:${en.type} UID:${en.uniqueId}`);
         EventProcessor.collectPromiseCall(AttackEntity, [pl, en], AttackEntity.EventImplList);
@@ -3168,7 +3161,6 @@ class ConsumeTotem {
      */
     static process(pl) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (EventProcessor.antiEventShake(pl, ConsumeTotem.EVENT)) return;
         LogUtils.debug(`参数列表:`, ...arguments);
         LogUtils.debug(`事件:${ConsumeTotem.EVENT} 名称:玩家消耗图腾 玩家:${pl.name}`);
         EventProcessor.eventImplsProcess(ConsumeTotem, [pl], ConsumeTotem.EventImplList).catch(err => {
@@ -3360,7 +3352,6 @@ class UseBucketTake {
      */
     static process(pl, item, target) {
         if (Utils.hasNullOrUndefined(...arguments)) return;
-        if (EventProcessor.antiEventShake(pl, UseBucketTake.EVENT)) return;
         LogUtils.debug(`参数列表:`, ...arguments);
         LogUtils.debug(`事件:${UseBucketTake.EVENT} 名称:玩家使用桶装东西 玩家:${pl.name} 物品:${item.type} 目标:${target.type}`);
         EventProcessor.eventImplsProcess(UseBucketTake, [pl, item, target], UseBucketTake.EventImplList).catch(err => {
