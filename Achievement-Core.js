@@ -1261,11 +1261,7 @@ class Configuration {
             if (res) return;
             return LangManager.updateLangFile(LANG);
         }).then(() => {
-
-            let newTypeCount = Runtime.entryTypeTotalCounts - PersistentCache.get(Constant.typeCount);
-            let newTotalCount = Runtime.entryTotalCounts - PersistentCache.get(Constant.totalCount);
             LogUtils.debug(Runtime.SystemInfo.init.langUpdate);
-            LogUtils.info(`累计新增 ${newTypeCount} 种成就类型, ${newTotalCount} 个成就词条`);
         });
 
         await Promise.all([configUpdate, langUpdate]).catch(err => {
